@@ -1,6 +1,6 @@
-# Welcome to your Expo app 👋
+# Revue
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+This is a placeholder README. It will be updated as we keep going. This project is running on React Native, with a Supabase backend and deployed on Expo Go and on TestFlight.
 
 ## Get started
 
