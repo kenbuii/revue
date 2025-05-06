@@ -1,8 +1,9 @@
 import React from 'react';
-import { StyleSheet, Text, View, Image, ScrollView, TouchableOpacity, FlatList } from 'react-native';
+import { StyleSheet, Text, View, Image, ScrollView, TouchableOpacity, FlatList, StatusBar } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { Stack } from 'expo-router';
 
 // Define types for notification data
 interface NotificationUser {
@@ -204,24 +205,37 @@ export default function NotificationsScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['right', 'left']}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="chevron-back" size={24} color="black" />
-          <Text style={styles.backText}>Back</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Notifications</Text>
-        <View style={styles.headerRight} />
-      </View>
+    <>
+      {/* Hide the default header */}
+      <Stack.Screen options={{ headerShown: false }} />
+      
+      <SafeAreaView style={styles.container}>
+        <View style={styles.topSpacer} />
+        
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <Ionicons name="chevron-back" size={24} color="#4CAF50" />
+            <Text style={styles.backText}>Back</Text>
+          </TouchableOpacity>
+          <View style={styles.headerCenter}>
+            <Image 
+              source={require('@/assets/images/logo.png')} 
+              style={styles.logo} 
+              resizeMode="contain"
+            />
+          </View>
+          <View style={styles.headerRight} />
+        </View>
 
-      <FlatList
-        data={notificationData}
-        renderItem={renderNotificationItem}
-        keyExtractor={item => item.id}
-        contentContainerStyle={styles.listContainer}
-        showsVerticalScrollIndicator={false}
-      />
-    </SafeAreaView>
+        <FlatList
+          data={notificationData}
+          renderItem={renderNotificationItem}
+          keyExtractor={item => item.id}
+          contentContainerStyle={styles.listContainer}
+          showsVerticalScrollIndicator={false}
+        />
+      </SafeAreaView>
+    </>
   );
 }
 
@@ -229,6 +243,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#FFFDF6',
+  },
+  topSpacer: {
+    height: 0, // Add extra spacing at the top
   },
   header: {
     flexDirection: 'row',
@@ -238,24 +255,33 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#F2F2F2',
+    marginBottom: 10, // Increased from 10 to 20
   },
   backButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    width: 70,
   },
   backText: {
     fontSize: 16,
     marginLeft: 2,
+    color: '#4CAF50',
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
+  headerCenter: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logo: {
+    height: 30,
+    width: 80,
   },
   headerRight: {
-    width: 60, // For balance with back button
+    width: 70, // For balance with back button
   },
   listContainer: {
     padding: 16,
+    paddingTop: 10,
   },
   notificationItem: {
     marginBottom: 20,
