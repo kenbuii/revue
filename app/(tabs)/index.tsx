@@ -1,5 +1,6 @@
 import React from 'react';
-import { ScrollView, StyleSheet, SafeAreaView, View } from 'react-native';
+import { ScrollView, StyleSheet, SafeAreaView, View, TouchableOpacity } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import HomeHeader from '@/components/HomeHeader';
 import FeedTabs from '@/components/FeedTabs';
 import PostCard from '@/components/PostCard';
@@ -15,6 +16,11 @@ export default function HomeScreen() {
           <PostCard key={post.id} post={post} />
         ))}
       </ScrollView>
+
+      {/* Post Button (FAB) */}
+      <TouchableOpacity style={styles.fab}>
+        <Feather name="plus" size={24} color="white" />
+      </TouchableOpacity>
     </SafeAreaView>
   );
 }
@@ -26,5 +32,21 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+  },
+  fab: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#007AFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
   },
 });

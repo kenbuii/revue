@@ -9,6 +9,8 @@ export default function SearchScreen() {
   );
 }
 
+//TODO -- add search page
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,

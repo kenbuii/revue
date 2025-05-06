@@ -9,6 +9,9 @@ export default function NotificationsScreen() {
   );
 }
 
+//TODO -- add notifs page
+
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,

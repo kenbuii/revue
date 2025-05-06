@@ -48,14 +48,21 @@ export default function ProfileScreen() {
       <ScrollView style={styles.container}>
         {/* Header with Settings */}
         <View style={styles.header}>
-          <Image 
-            source={require('@/assets/images/logo.png')} 
-            style={styles.logo} 
-            resizeMode="contain"
-          />
-          <TouchableOpacity>
-            <Feather name="settings" size={24} color="black" />
-          </TouchableOpacity>
+          <View style={styles.headerLeft}>
+            <View />
+          </View>
+          <View style={styles.headerCenter}>
+            <Image 
+              source={require('@/assets/images/logo.png')} 
+              style={styles.logo} 
+              resizeMode="contain"
+            />
+          </View>
+          <View style={styles.headerRight}>
+            <TouchableOpacity>
+              <Feather name="settings" size={24} color="black" />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Profile Info */}
@@ -152,10 +159,20 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 10,
+    alignItems: 'center',
+  },
+  headerLeft: {
+    flex: 1,
+  },
+  headerCenter: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  headerRight: {
+    flex: 1,
+    alignItems: 'flex-end',
   },
   logo: {
     height: 30,
