@@ -7,6 +7,26 @@ import PostCard from '@/components/PostCard';
 import { samplePosts } from '@/constants/mockData';
 
 export default function HomeScreen() {
+  // TODO: Implement Supabase integration for fetching posts
+  // useEffect(() => {
+  //   const fetchPosts = async () => {
+  //     // Fetch user's feed from Supabase
+  //     // const { data, error } = await supabase
+  //     //   .from('posts')
+  //     //   .select('*, user:users(*), likes:likes(count), comments:comments(count)')
+  //     //   .order('created_at', { ascending: false });
+  //   };
+  //   fetchPosts();
+  // }, []);
+
+  // TODO: Implement like/comment functionality with Supabase
+  // const handleLike = async (postId) => {
+  //   // Add like to Supabase
+  //   // const { data, error } = await supabase
+  //   //   .from('likes')
+  //   //   .insert({ post_id: postId, user_id: currentUserId });
+  // };
+
   return (
     <SafeAreaView style={styles.container}>
       <HomeHeader />

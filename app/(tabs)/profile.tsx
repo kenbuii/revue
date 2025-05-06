@@ -13,6 +13,45 @@ const profileData = {
   following: 10
 };
 
+// TODO: Replace with data from Supabase when implementing backend
+// useEffect(() => {
+//   const fetchProfileData = async () => {
+//     // Get user profile data from Supabase
+//     // const { data: userData, error: userError } = await supabase
+//     //   .from('users')
+//     //   .select('*')
+//     //   .eq('id', userId)
+//     //   .single();
+//
+//     // Get user stats from Supabase
+//     // const { data: statsData, error: statsError } = await supabase
+//     //   .rpc('get_user_stats', { user_id: userId });
+//
+//     // Get user's current reads
+//     // const { data: onVueData, error: onVueError } = await supabase
+//     //   .from('user_books')
+//     //   .select('*, book:books(*)')
+//     //   .eq('user_id', userId)
+//     //   .eq('status', 'reading');
+//
+//     // Get user's favorite books
+//     // const { data: favoritesData, error: favoritesError } = await supabase
+//     //   .from('user_books')
+//     //   .select('*, book:books(*), review:reviews(*)')
+//     //   .eq('user_id', userId)
+//     //   .eq('is_favorite', true);
+//
+//     // Get user's recent reviews
+//     // const { data: reviewsData, error: reviewsError } = await supabase
+//     //   .from('reviews')
+//     //   .select('*, book:books(*)')
+//     //   .eq('user_id', userId)
+//     //   .order('created_at', { ascending: false })
+//     //   .limit(5);
+//   };
+//   fetchProfileData();
+// }, []);
+
 const onVueItems = [
   { id: '1', title: 'Harry Potter', cover: 'https://m.media-amazon.com/images/I/51DF6ZR8G7L._AC_UF894,1000_QL80_.jpg', author: 'J.K. ROWLING' },
   { id: '2', title: 'Pride & Prejudice', cover: 'https://m.media-amazon.com/images/I/71Q1tPupKjL._AC_UF1000,1000_QL80_.jpg', author: 'PRIDE & PREJUDICE' },
@@ -43,6 +82,14 @@ const recentRevues = [
 ];
 
 export default function ProfileScreen() {
+  // TODO: Implement follow/unfollow functionality with Supabase
+  // const handleFollow = async (userId) => {
+  //   // Add follower relationship to Supabase
+  //   // const { data, error } = await supabase
+  //   //   .from('follows')
+  //   //   .insert({ follower_id: currentUserId, following_id: userId });
+  // };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView style={styles.container}>
