@@ -2,6 +2,12 @@
 
 This is a placeholder README. It will be updated as we keep going. This project is running on React Native, with a Supabase backend and deployed on Expo Go and on TestFlight.
 
+## How to use github
+
+1. commit *constantly*!!!!!!!!!
+2. commit, and then push updates
+3. 
+
 ## Get started
 
 1. Install dependencies
