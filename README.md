@@ -6,9 +6,9 @@ This is a placeholder README. It will be updated as we keep going. This project 
 
 1. commit *constantly*!!!!!!!!!
 2. commit, and then push updates
-3. 
+3. pull from origin *before* you start editing code. no one wants to deal with merge error clearing/overwrites
 
-## Get started
+## Instructions on running on local
 
 1. Install dependencies
 
@@ -21,6 +21,14 @@ This is a placeholder README. It will be updated as we keep going. This project 
    ```bash
     npx expo start
    ```
+3. Find the QR code in the terminal output and scan it with your phone, OR open Expo Go on your phone and connect to the local server.
+
+4. If there are issues, you likely need to update Expo Go or update the local Expo packages on your local machine. Try the following commands:
+   ```bash
+   npm install --global expo-cli
+   ```
+
+##ALL INSTRUCTIONS BELOW ARE BOILERPLATE. Ignore.
 
 In the output, you'll find options to open the app in a
 
@@ -47,10 +55,3 @@ To learn more about developing your project with Expo, look at the following res
 
 - [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
 - [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
