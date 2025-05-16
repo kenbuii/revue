@@ -243,7 +243,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#F2F2F2',
-    paddingBottom: 20,
+    paddingBottom: 12,
   },
   notificationHeader: {
     flexDirection: 'row',

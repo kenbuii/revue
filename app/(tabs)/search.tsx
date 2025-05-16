@@ -146,11 +146,6 @@ export default function SearchScreen() {
           {/* TODO: Add Supabase query to fetch trending topics */}
           {/* TODO: Add Supabase query to fetch trending posts */}
           {/* TODO: Add function to handle user search and query Supabase */}
-          
-          {/* Add button in bottom right */}
-          <TouchableOpacity style={styles.addButton}>
-            <Feather name="plus" size={30} color="#FFF" />
-          </TouchableOpacity>
         </ScrollView>
       </TouchableWithoutFeedback>
     </SafeAreaView>
@@ -236,25 +231,9 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   postText: {
-    fontSize: 10,
+    fontSize: 12,
     lineHeight: 12,
     color: '#333',
     height: 100,
-  },
-  addButton: {
-    position: 'absolute',
-    bottom: 20,
-    right: 20,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#004D00',
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
   },
 });

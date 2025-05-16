@@ -1,35 +1,87 @@
-import React, { useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useState, useRef } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View, ScrollView, Dimensions, NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
+import PostCard from '@/components/PostCard';
+import { samplePosts } from '@/constants/mockData';
+
+type TabType = 'forYou' | 'friends';
 
 export default function FeedTabs() {
-  const [activeTab, setActiveTab] = useState('forYou');
+  const [activeTab, setActiveTab] = useState<TabType>('forYou');
+  const scrollViewRef = useRef<ScrollView>(null);
+  const { width: screenWidth } = Dimensions.get('window');
+
+  const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const offsetX = event.nativeEvent.contentOffset.x;
+    const newTab: TabType = offsetX >= screenWidth / 2 ? 'friends' : 'forYou';
+    if (newTab !== activeTab) {
+      setActiveTab(newTab);
+    }
+  };
+
+  const handleTabPress = (tab: TabType) => {
+    setActiveTab(tab);
+    scrollViewRef.current?.scrollTo({
+      x: tab === 'friends' ? screenWidth : 0,
+      animated: true,
+    });
+  };
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity 
-        style={[styles.tab, activeTab === 'forYou' && styles.activeTab]} 
-        onPress={() => setActiveTab('forYou')}
+      <View style={styles.tabsContainer}>
+        <TouchableOpacity 
+          style={[styles.tab, activeTab === 'forYou' && styles.activeTab]} 
+          onPress={() => handleTabPress('forYou')}
+        >
+          <Text style={[styles.tabText, activeTab === 'forYou' && styles.activeTabText]}>for you</Text>
+          {activeTab === 'forYou' && <View style={styles.activeIndicator} />}
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={[styles.tab, activeTab === 'friends' && styles.activeTab]}
+          onPress={() => handleTabPress('friends')}
+        >
+          <Text style={[styles.tabText, activeTab === 'friends' && styles.activeTabText]}>friends + following</Text>
+          {activeTab === 'friends' && <View style={styles.activeIndicator} />}
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView
+        ref={scrollViewRef}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+        contentContainerStyle={styles.scrollContent}
       >
-        <Text style={[styles.tabText, activeTab === 'forYou' && styles.activeTabText]}>for you</Text>
-        {activeTab === 'forYou' && <View style={styles.activeIndicator} />}
-      </TouchableOpacity>
-      
-      <TouchableOpacity 
-        style={[styles.tab, activeTab === 'friends' && styles.activeTab]}
-        onPress={() => setActiveTab('friends')}
-      >
-        <Text style={[styles.tabText, activeTab === 'friends' && styles.activeTabText]}>friends + following</Text>
-        {activeTab === 'friends' && <View style={styles.activeIndicator} />}
-      </TouchableOpacity>
+        {/* For You Tab */}
+        <ScrollView style={[styles.tabContent, { width: screenWidth }]}>
+          {samplePosts.map((post) => (
+            <PostCard key={post.id} post={post} />
+          ))}
+        </ScrollView>
+
+        {/* Friends + Following Tab */}
+        <ScrollView style={[styles.tabContent, { width: screenWidth }]}>
+          {samplePosts.map((post) => (
+            <PostCard key={post.id} post={post} />
+          ))}
+        </ScrollView>
+      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
+  },
+  tabsContainer: {
     flexDirection: 'row',
     borderBottomWidth: 1,
     borderBottomColor: '#E8E8E8',
+    backgroundColor: '#FFFDF6',
   },
   tab: {
     flex: 1,
@@ -53,5 +105,11 @@ const styles = StyleSheet.create({
     width: '80%',
     backgroundColor: '#004D00',
     borderRadius: 2,
+  },
+  scrollContent: {
+    flexGrow: 1,
+  },
+  tabContent: {
+    flex: 1,
   },
 });
