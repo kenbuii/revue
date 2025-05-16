@@ -1,8 +1,39 @@
 import React from 'react';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { router } from 'expo-router';
 
-export default function PostCard({ post }) {
+interface Media {
+  id: string;
+  title: string;
+  type: string;
+  progress?: string;
+  cover: string;
+}
+
+interface User {
+  name: string;
+  avatar: string;
+}
+
+interface Post {
+  id: string;
+  user: User;
+  media: Media;
+  date: string;
+  title?: string;
+  contentType: 'image' | 'text';
+  content: string;
+  commentCount: number;
+  likeCount: number;
+}
+
+export default function PostCard({ post }: { post: Post }) {
+  const handleMediaPress = () => {
+    console.log('Media pressed, navigating to media detail page');
+    router.push('/media/1');
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -19,13 +50,19 @@ export default function PostCard({ post }) {
         </TouchableOpacity>
       </View>
       
-      <View style={styles.mediaInfo}>
-        <View>
-          <Text style={styles.mediaTitle}>{post.media.title}</Text>
-          <Text style={styles.mediaDetails}>{post.date} • {post.media.type} {post.media.progress}</Text>
+      <TouchableOpacity 
+        onPress={handleMediaPress}
+        style={styles.mediaInfoContainer}
+        activeOpacity={0.7}
+      >
+        <View style={styles.mediaInfo}>
+          <View>
+            <Text style={styles.mediaTitle}>{post.media.title}</Text>
+            <Text style={styles.mediaDetails}>{post.date} • {post.media.type} {post.media.progress}</Text>
+          </View>
+          <Image source={{ uri: post.media.cover }} style={styles.mediaCover} />
         </View>
-        <Image source={{ uri: post.media.cover }} style={styles.mediaCover} />
-      </View>
+      </TouchableOpacity>
       
       {post.title && <Text style={styles.postTitle}>{post.title}</Text>}
       
@@ -89,10 +126,15 @@ const styles = StyleSheet.create({
     color: '#666',
     fontSize: 14,
   },
+  mediaInfoContainer: {
+    backgroundColor: '#F5F5F5',
+    borderRadius: 8,
+    padding: 8,
+    marginBottom: 10,
+  },
   mediaInfo: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 10,
   },
   mediaTitle: {
     color: '#004D00',

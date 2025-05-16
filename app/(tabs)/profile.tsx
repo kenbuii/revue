@@ -83,6 +83,12 @@ const recentRevues = [
 ];
 
 export default function ProfileScreen() {
+  const SettingsButton = () => (
+    <TouchableOpacity style={styles.settingsButton}>
+      <Feather name="settings" size={24} color="#000" />
+    </TouchableOpacity>
+  );
+
   // TODO: Implement follow/unfollow functionality with Supabase
   // const handleFollow = async (userId) => {
   //   // Add follower relationship to Supabase
@@ -92,19 +98,9 @@ export default function ProfileScreen() {
   // };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.header}>
-        <View style={styles.headerLeft} />
-        <View style={styles.headerCenter}>
-          <AppHeader />
-        </View>
-        <View style={styles.headerRight}>
-          <TouchableOpacity style={styles.settingsButton}>
-            <Feather name="settings" size={24} color="#000" />
-          </TouchableOpacity>
-        </View>
-      </View>
-      <ScrollView style={styles.container}>
+    <SafeAreaView style={styles.container}>
+      <AppHeader rightComponent={<SettingsButton />} />
+      <ScrollView>
         {/* Profile Info */}
         <View style={styles.profileContainer}>
           <View style={styles.profileInfo}>
@@ -189,36 +185,13 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#FFFDF6',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    width: '100%',
-  },
-  headerLeft: {
-    flex: 1,
-  },
-  headerCenter: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  headerRight: {
-    flex: 1,
-    alignItems: 'flex-end',
-  },
-  settingsButton: {
-    padding: 8,
-    marginTop: -4,
-  },
   container: {
     flex: 1,
     backgroundColor: '#FFFDF6',
+  },
+  settingsButton: {
+    padding: 8,
+    marginRight: -8,
   },
   profileContainer: {
     paddingHorizontal: 20,

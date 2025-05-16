@@ -8,9 +8,16 @@ interface AppHeaderProps {
   showLogo?: boolean;
   title?: string;
   showSearchBar?: boolean;
+  rightComponent?: React.ReactNode;
 }
 
-export default function AppHeader({ showBackButton = false, showLogo = true, title, showSearchBar = false }: AppHeaderProps) {
+export default function AppHeader({ 
+  showBackButton = false, 
+  showLogo = true, 
+  title, 
+  showSearchBar = false,
+  rightComponent
+}: AppHeaderProps) {
   const router = useRouter();
 
   return (
@@ -37,7 +44,9 @@ export default function AppHeader({ showBackButton = false, showLogo = true, tit
           ) : null}
         </View>
         
-        <View style={styles.headerRight} />
+        <View style={styles.headerRight}>
+          {rightComponent}
+        </View>
       </View>
       {showSearchBar && (
         <View style={styles.searchContainer}>
@@ -61,21 +70,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 0,
+    height: 44,
     borderBottomWidth: 1,
     borderBottomColor: '#F2F2F2',
     backgroundColor: '#FFFDF6',
   },
   headerLeft: {
     width: 70,
+    height: '100%',
+    justifyContent: 'center',
   },
   headerCenter: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    height: '100%',
   },
   headerRight: {
     width: 70,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    height: '100%',
   },
   backButton: {
     flexDirection: 'row',
