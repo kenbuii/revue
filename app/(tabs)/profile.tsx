@@ -93,7 +93,17 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <AppHeader />
+      <View style={styles.header}>
+        <View style={styles.headerLeft} />
+        <View style={styles.headerCenter}>
+          <AppHeader />
+        </View>
+        <View style={styles.headerRight}>
+          <TouchableOpacity style={styles.settingsButton}>
+            <Feather name="settings" size={24} color="#000" />
+          </TouchableOpacity>
+        </View>
+      </View>
       <ScrollView style={styles.container}>
         {/* Profile Info */}
         <View style={styles.profileContainer}>
@@ -182,6 +192,29 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: '#FFFDF6',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    width: '100%',
+  },
+  headerLeft: {
+    flex: 1,
+  },
+  headerCenter: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  headerRight: {
+    flex: 1,
+    alignItems: 'flex-end',
+  },
+  settingsButton: {
+    padding: 8,
+    marginTop: -4,
   },
   container: {
     flex: 1,
