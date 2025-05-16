@@ -4,6 +4,7 @@ import { Feather, Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Stack } from 'expo-router';
+import AppHeader from '@/components/AppHeader';
 
 // Define types for notification data
 interface NotificationUser {
@@ -212,20 +213,7 @@ export default function NotificationsScreen() {
       <SafeAreaView style={styles.container}>
         <View style={styles.topSpacer} />
         
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <Ionicons name="chevron-back" size={24} color="#4CAF50" />
-            <Text style={styles.backText}>Back</Text>
-          </TouchableOpacity>
-          <View style={styles.headerCenter}>
-            <Image 
-              source={require('@/assets/images/logo.png')} 
-              style={styles.logo} 
-              resizeMode="contain"
-            />
-          </View>
-          <View style={styles.headerRight} />
-        </View>
+        <AppHeader showBackButton={true} />
 
         <FlatList
           data={notificationData}
@@ -245,39 +233,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFDF6',
   },
   topSpacer: {
-    height: 0, // Add extra spacing at the top
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F2F2F2',
-    marginBottom: 10, // Increased from 10 to 20
-  },
-  backButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    width: 70,
-  },
-  backText: {
-    fontSize: 16,
-    marginLeft: 2,
-    color: '#4CAF50',
-  },
-  headerCenter: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  logo: {
-    height: 30,
-    width: 80,
-  },
-  headerRight: {
-    width: 70, // For balance with back button
+    height: 0,
   },
   listContainer: {
     padding: 16,

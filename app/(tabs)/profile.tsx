@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, Text, View, Image, ScrollView, TouchableOpacity, FlatList } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AppHeader from '@/components/AppHeader';
 
 // Mock data
 const profileData = {
@@ -92,26 +93,8 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <AppHeader />
       <ScrollView style={styles.container}>
-        {/* Header with Settings */}
-        <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            <View />
-          </View>
-          <View style={styles.headerCenter}>
-            <Image 
-              source={require('@/assets/images/logo.png')} 
-              style={styles.logo} 
-              resizeMode="contain"
-            />
-          </View>
-          <View style={styles.headerRight}>
-            <TouchableOpacity>
-              <Feather name="settings" size={24} color="black" />
-            </TouchableOpacity>
-          </View>
-        </View>
-
         {/* Profile Info */}
         <View style={styles.profileContainer}>
           <View style={styles.profileInfo}>
@@ -204,27 +187,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFDF6',
   },
-  header: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    alignItems: 'center',
-  },
-  headerLeft: {
-    flex: 1,
-  },
-  headerCenter: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  headerRight: {
-    flex: 1,
-    alignItems: 'flex-end',
-  },
-  logo: {
-    height: 30,
-    width: 80,
-  },
   profileContainer: {
     paddingHorizontal: 20,
     marginBottom: 20,
@@ -253,17 +215,17 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   bio: {
-    fontSize: 13,
+    fontSize: 10,
     color: '#333',
-    lineHeight: 18,
-    marginBottom: 10,
+    lineHeight: 15,
+    marginBottom: 7,
   },
   statsContainer: {
     flexDirection: 'row',
     marginTop: 5,
   },
   statItem: {
-    marginRight: 20,
+    marginRight: 15,
     flexDirection: 'row',
     alignItems: 'center',
   },
@@ -280,7 +242,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 13,
     fontWeight: 'bold',
     paddingHorizontal: 20,
     marginBottom: 10,

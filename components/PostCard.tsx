@@ -110,9 +110,9 @@ const styles = StyleSheet.create({
     borderRadius: 5,
   },
   postTitle: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '500',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   contentImage: {
     width: '100%',
@@ -121,9 +121,9 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   contentText: {
-    fontSize: 15,
-    lineHeight: 22,
-    marginBottom: 10,
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 8,
   },
   actions: {
     flexDirection: 'row',

@@ -1,6 +1,8 @@
 import React from 'react';
-import { StyleSheet, Text, View, TextInput, Image, ScrollView, TouchableOpacity, Keyboard, TouchableWithoutFeedback } from 'react-native';
+import { StyleSheet, Text, View, Image, ScrollView, TouchableOpacity, Keyboard, TouchableWithoutFeedback } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import AppHeader from '@/components/AppHeader';
 
 // Types
 interface User {
@@ -66,24 +68,6 @@ const trendingPosts: Post[] = [
 ];
 
 // Components
-const SearchBar = () => (
-  <View style={styles.searchContainer}>
-    <Image 
-      source={require('@/assets/images/logo.png')} 
-      style={styles.logoImage}
-      resizeMode="contain"
-    />
-    <View style={styles.searchInputContainer}>
-      <TextInput
-        style={styles.searchInput}
-        placeholder="Search"
-        placeholderTextColor="#666"
-      />
-      <Feather name="search" size={20} color="#666" style={styles.searchIcon} />
-    </View>
-  </View>
-);
-
 interface TrendingHeaderProps {
   title: string;
   postCount: string;
@@ -129,79 +113,58 @@ const PostCard = ({ post }: PostCardProps) => (
 
 export default function SearchScreen() {
   return (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-      <ScrollView style={styles.container}>
-        <SearchBar />
-        
-        <Text style={styles.sectionTitle}>Trending Now</Text>
-        
-        <TrendingHeader 
-          title="THE WHITE LOTUS" 
-          postCount="184" 
-        />
-        
-        <View style={styles.postsContainer}>
-          {trendingPosts.map(post => (
-            <PostCard key={post.id} post={post} />
-          ))}
-        </View>
-        
-        <TrendingHeader 
-          title="THE WHITE LOTUS" 
-          postCount="184" 
-        />
-        
-        <View style={styles.postsContainer}>
-          {trendingPosts.map(post => (
-            <PostCard key={`second-${post.id}`} post={post} />
-          ))}
-        </View>
-        
-        {/* Placeholder for Supabase integration */}
-        {/* TODO: Add Supabase query to fetch trending topics */}
-        {/* TODO: Add Supabase query to fetch trending posts */}
-        {/* TODO: Add function to handle user search and query Supabase */}
-        
-        {/* Add button in bottom right */}
-        <TouchableOpacity style={styles.addButton}>
-          <Feather name="plus" size={30} color="#FFF" />
-        </TouchableOpacity>
-      </ScrollView>
-    </TouchableWithoutFeedback>
+    <SafeAreaView style={styles.safeArea}>
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <ScrollView style={styles.container}>
+          <AppHeader showLogo={true} showSearchBar={true} />
+          
+          <Text style={styles.sectionTitle}>Trending Now</Text>
+          
+          <TrendingHeader 
+            title="THE WHITE LOTUS" 
+            postCount="184" 
+          />
+          
+          <View style={styles.postsContainer}>
+            {trendingPosts.map(post => (
+              <PostCard key={post.id} post={post} />
+            ))}
+          </View>
+          
+          <TrendingHeader 
+            title="THE WHITE LOTUS" 
+            postCount="184" 
+          />
+          
+          <View style={styles.postsContainer}>
+            {trendingPosts.map(post => (
+              <PostCard key={`second-${post.id}`} post={post} />
+            ))}
+          </View>
+          
+          {/* Placeholder for Supabase integration */}
+          {/* TODO: Add Supabase query to fetch trending topics */}
+          {/* TODO: Add Supabase query to fetch trending posts */}
+          {/* TODO: Add function to handle user search and query Supabase */}
+          
+          {/* Add button in bottom right */}
+          <TouchableOpacity style={styles.addButton}>
+            <Feather name="plus" size={30} color="#FFF" />
+          </TouchableOpacity>
+        </ScrollView>
+      </TouchableWithoutFeedback>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#FFFDF6',
+  },
   container: {
     flex: 1,
     backgroundColor: '#FFFDF6',
-  },
-  searchContainer: {
-    padding: 16,
-    paddingTop: 24,
-    backgroundColor: '#FFFDF6',
-  },
-  logoImage: {
-    height: 30,
-    alignSelf: 'center',
-    marginTop: 35,
-    marginBottom: 10,
-  },
-  searchInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F5F3E4',
-    borderRadius: 20,
-    paddingHorizontal: 15,
-    height: 40,
-  },
-  searchInput: {
-    flex: 1,
-    height: 40,
-    fontSize: 16,
-  },
-  searchIcon: {
-    marginLeft: 10,
   },
   sectionTitle: {
     fontSize: 18,
