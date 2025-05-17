@@ -117,30 +117,34 @@ export default function SearchScreen() {
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <ScrollView style={styles.container}>
           <AppHeader showLogo={true} showSearchBar={true} />
-          
           <Text style={styles.sectionTitle}>Trending Now</Text>
+          <View style={styles.trendingSection}>
+            <TrendingHeader title="THE WHITE LOTUS" postCount="184" />
+
+            <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false} 
+                contentContainerStyle={styles.horizontalPostList}
+            >
+                {trendingPosts.map(post => (
+                <PostCard key={post.id} post={post} />
+                ))}
+            </ScrollView>
+        </View>
           
-          <TrendingHeader 
-            title="THE WHITE LOTUS" 
-            postCount="184" 
-          />
-          
-          <View style={styles.postsContainer}>
-            {trendingPosts.map(post => (
-              <PostCard key={post.id} post={post} />
-            ))}
-          </View>
-          
-          <TrendingHeader 
-            title="THE WHITE LOTUS" 
-            postCount="184" 
-          />
-          
-          <View style={styles.postsContainer}>
-            {trendingPosts.map(post => (
-              <PostCard key={`second-${post.id}`} post={post} />
-            ))}
-          </View>
+        <View style={styles.trendingSection}>
+            <TrendingHeader title="THE WHITE LOTUS" postCount="184" />
+
+            <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false} 
+                contentContainerStyle={styles.horizontalPostList}
+            >
+                {trendingPosts.map(post => (
+                <PostCard key={post.id} post={post} />
+                ))}
+            </ScrollView>
+        </View>
           
           {/* Placeholder for Supabase integration */}
           {/* TODO: Add Supabase query to fetch trending topics */}
@@ -162,41 +166,68 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFDF6',
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '500',
+    fontSize: 22,
+    fontWeight: '600',
     marginLeft: 16,
-    marginTop: 10,
-    marginBottom: 10,
+    marginTop: 16,
+    marginBottom: 16,
+    // color: '#004D00',
   },
   trendingHeaderContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 12,
+     backgroundColor: '#F8F6ED',
+    borderRadius: 12,
+    marginBottom: 12,
   },
+  trendingSection: {
+    backgroundColor: '#F8F6ED',
+    borderRadius: 16,
+    marginHorizontal: 16,
+    marginBottom: 24,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+},
+horizontalPostList: {
+  flexDirection: 'row',
+  gap: 12,
+  paddingTop: 8,
+  paddingBottom: 4,
+},
+postCard: {
+  width: 180,
+  backgroundColor: '#FFF',
+  borderRadius: 12,
+  padding: 10,
+  marginRight: 4,
+  shadowColor: '#000',
+  shadowOpacity: 0.03,
+  shadowRadius: 3,
+  shadowOffset: { width: 0, height: 1 },
+  elevation: 1,
+},
   trendingTitle: {
-    fontSize: 14,
-    fontWeight: 'bold',
+    fontSize: 16,
+    fontWeight: '700',
     color: '#004D00',
+    marginBottom: 2,
   },
   postCount: {
-    fontSize: 12,
+    fontSize: 13,
     color: '#666',
   },
   trendingImage: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-  },
-  postsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    padding: 8,
-  },
-  postCard: {
-    width: '33%',
-    padding: 4,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
   },
   postHeader: {
     flexDirection: 'row',
@@ -231,9 +262,9 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   postText: {
-    fontSize: 12,
-    lineHeight: 12,
+    fontSize: 13,
+    lineHeight: 18,
     color: '#333',
-    height: 100,
+    marginTop: 6,
   },
 });
