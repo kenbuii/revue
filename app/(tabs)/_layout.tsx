@@ -1,9 +1,15 @@
 import React from 'react';
 import { Image, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { Tabs } from 'expo-router';
+import { Tabs, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 
 export default function TabLayout() {
+  const router = useRouter();
+
+  const handleNewPost = () => {
+    router.push('/(post_flow)/step1');
+  };
+
   return (
     <View style={styles.container}>
       <Tabs
@@ -65,7 +71,7 @@ export default function TabLayout() {
       </Tabs>
 
       {/* Persistent Add Post Button */}
-      <TouchableOpacity style={styles.fab}>
+      <TouchableOpacity style={styles.fab} onPress={handleNewPost}>
         <Feather name="plus" size={24} color="white" />
       </TouchableOpacity>
     </View>
