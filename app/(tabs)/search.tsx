@@ -48,7 +48,7 @@ const trendingPosts: Post[] = [
     },
     content: {
       type: 'text',
-      text: 'user post/content lorem ipsum Lorem ipsum is simply dummy text of the printing and typesetting industry Lorem Ipsum has been the industry\'s standard dummy text'
+      text: 'really short dummy text'
     },
     isRevuing: true
   },
@@ -61,7 +61,7 @@ const trendingPosts: Post[] = [
     },
     content: {
       type: 'text',
-      text: 'user post/content lorem ipsum Lorem ipsum is simply dummy text of the printing and typesetting industry Lorem Ipsum has been the industry\'s standard dummy text'
+      text: 'long dummy text user post/content lorem ipsum Lorem ipsum is simply dummy text of the printing and typesetting industry Lorem Ipsum has been the industry\'s standard dummy text'
     },
     isRevuing: true
   },
@@ -106,7 +106,18 @@ const PostCard = ({ post }: PostCardProps) => (
     {post.content.type === 'image' ? (
       <Image source={{ uri: post.content.source }} style={styles.postImage} />
     ) : (
-      <Text style={styles.postText}>{post.content.text}</Text>
+    post.content.type === 'text' && post.content.text ? (
+        <Text style={styles.postText}>
+            {post.content.text.length > 100
+            ? `${post.content.text.slice(0, 100)}… `
+            : post.content.text}
+            {post.content.text.length > 100 && (
+            <Text style={styles.readMore}>Read more</Text>
+            )}
+        </Text>
+        ) : post.content.type === 'text' ? (
+        <Text style={styles.postText}>[No content provided]</Text>
+        ) : null
     )}
   </View>
 );
@@ -267,4 +278,8 @@ postCard: {
     color: '#333',
     marginTop: 6,
   },
+  readMore: {
+    color: '#004D00',
+    fontWeight: '600',
+ },
 });
