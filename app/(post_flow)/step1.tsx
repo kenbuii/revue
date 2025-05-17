@@ -26,6 +26,14 @@ export default function Step1() {
   return (
     <View style={styles.container}>
       <View style={styles.content}>
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={() => router.push('/(tabs)')}
+        >
+          <Ionicons name="chevron-back" size={24} color="#000" />
+          <Text style={styles.backText}>Back</Text>
+        </TouchableOpacity>
+
         <Text style={styles.headerTitle}>write a new revue</Text>
         <Text style={styles.stepTitle}>STEP 1</Text>
         <Text style={styles.subtitle}>type of media to revue</Text>
@@ -55,7 +63,7 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 20,
-    paddingTop: 60,
+    paddingTop: 100,
   },
   headerTitle: {
     fontSize: 24,
@@ -89,5 +97,20 @@ const styles = StyleSheet.create({
     marginTop: 10,
     fontSize: 16,
     color: '#2F4F4F',
+  },
+  backButton: {
+    position: 'absolute',
+    top: 60,
+    left: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+    borderRadius: 5,
+  },
+  backText: {
+    marginLeft: 10,
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#000',
   },
 }); 

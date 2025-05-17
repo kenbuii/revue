@@ -21,6 +21,14 @@ export default function Step3() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={() => router.back()}
+        >
+          <Ionicons name="chevron-back" size={24} color="#000" />
+          <Text style={styles.backText}>Back</Text>
+        </TouchableOpacity>
+
         <Text style={styles.headerTitle}>write a new revue</Text>
         <Text style={styles.stepTitle}>STEP 3</Text>
 
@@ -96,7 +104,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 20,
-    paddingTop: 20,
+    paddingTop: 60,
     paddingBottom: 40,
   },
   headerTitle: {
@@ -242,5 +250,15 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
+  },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+  },
+  backText: {
+    fontSize: 16,
+    color: '#2F4F4F',
+    marginLeft: 10,
   },
 }); 

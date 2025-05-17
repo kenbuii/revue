@@ -10,16 +10,17 @@ export default function PostFlowLayout() {
       <Stack.Screen
         name="step1"
         options={{
-          headerShown: true,
-          headerTitle: "",
-          headerShadowVisible: false,
-          headerStyle: {
-            backgroundColor: '#FAF9F6',
-          },
+          headerShown: false,
         }}
       />
       <Stack.Screen
         name="step2"
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="step3"
         options={{
           headerShown: false,
         }}
