@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, StyleSheet, TextInput } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, TextInput, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
@@ -16,15 +16,11 @@ export default function Step3() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.content}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <Ionicons name="chevron-back" size={24} color="#000" />
-          <Text style={styles.backText}>Back</Text>
-        </TouchableOpacity>
-
+      <ScrollView 
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         <Text style={styles.headerTitle}>write a new revue</Text>
         <Text style={styles.stepTitle}>STEP 3</Text>
 
@@ -85,7 +81,7 @@ export default function Step3() {
         <TouchableOpacity style={styles.postButton} onPress={handlePost}>
           <Text style={styles.postButtonText}>Post</Text>
         </TouchableOpacity>
-      </View>
+      </ScrollView>
     </View>
   );
 }
@@ -95,19 +91,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FAF9F6',
   },
-  content: {
+  scrollView: {
     flex: 1,
+  },
+  scrollContent: {
     paddingHorizontal: 20,
-    paddingTop: 60,
-  },
-  backButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  backText: {
-    fontSize: 16,
-    marginLeft: 5,
+    paddingTop: 20,
+    paddingBottom: 40,
   },
   headerTitle: {
     fontSize: 24,
