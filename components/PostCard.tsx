@@ -2,6 +2,7 @@ import React from 'react';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 
 interface Media {
   id: string;
@@ -74,17 +75,17 @@ export default function PostCard({ post }: { post: Post }) {
       
       <View style={styles.actions}>
         <TouchableOpacity style={styles.actionButton}>
-          <Image source={require('@/assets/images/chat.png')} style={styles.actionIcon} />
-          <Text style={styles.actionText}>{post.commentCount} comments</Text>
+            <Ionicons name="chatbox-ellipses-outline" size={18} color="#004D00" style={styles.actionIcon} />
+            <Text style={styles.actionText}>{post.commentCount} comments</Text>
         </TouchableOpacity>
         
         <TouchableOpacity style={styles.actionButton}>
-          <Image source={require('@/assets/images/like.png')} style={styles.actionIcon} />
-          <Text style={styles.actionText}>{post.likeCount} likes</Text>
+            <Ionicons name="heart-outline" size={18} color="#004D00" style={styles.actionIcon} />
+            <Text style={styles.actionText}>{post.likeCount} likes</Text>
         </TouchableOpacity>
         
         <TouchableOpacity style={styles.actionButton}>
-          <Image source={require('@/assets/images/bookmark.png')} style={styles.actionIcon} />
+            <Ionicons name="bookmark-outline" size={18} color="#004D00" style={styles.actionIcon} />
         </TouchableOpacity>
       </View>
     </View>
@@ -180,6 +181,7 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     marginRight: 5,
+    marginTop: 5,
   },
   actionText: {
     color: '#666',
