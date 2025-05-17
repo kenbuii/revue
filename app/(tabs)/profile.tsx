@@ -3,6 +3,7 @@ import { StyleSheet, Text, View, Image, ScrollView, TouchableOpacity, FlatList }
 import { Feather } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AppHeader from '@/components/AppHeader';
+import { router } from 'expo-router';
 
 // Mock data
 const profileData = {
@@ -84,7 +85,10 @@ const recentRevues = [
 
 export default function ProfileScreen() {
   const SettingsButton = () => (
-    <TouchableOpacity style={styles.settingsButton}>
+    <TouchableOpacity 
+      style={styles.settingsButton}
+      onPress={() => router.push('../settings')}
+    >
       <Feather name="settings" size={24} color="#000" />
     </TouchableOpacity>
   );
