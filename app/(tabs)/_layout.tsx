@@ -2,6 +2,7 @@ import React from 'react';
 import { Image, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Tabs, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function TabLayout() {
   const router = useRouter();
@@ -24,11 +25,12 @@ export default function TabLayout() {
           name="index"
           options={{
             title: 'Home',
-            tabBarIcon: ({ focused }) => (
-              <Image
-                source={focused ? require('@/assets/tab_bar/home_active.png') : require('@/assets/tab_bar/home.png')}
-                style={{ width: 24, height: 24 }}
-              />
+            tabBarIcon: ({ focused, color, size }) => (
+                <Ionicons 
+                    name={focused ? 'home' : 'home-outline'} 
+                    size={size ?? 24} 
+                    color={color ?? '#004D00'} 
+                />
             ),
           }}
         />
@@ -36,11 +38,12 @@ export default function TabLayout() {
           name="search"
           options={{
             title: 'Search',
-            tabBarIcon: ({ focused }) => (
-              <Image
-                source={focused ? require('@/assets/tab_bar/search_active.png') : require('@/assets/tab_bar/search.png')}
-                style={{ width: 24, height: 24 }}
-              />
+            tabBarIcon: ({ focused, color, size }) => (
+                <Ionicons 
+                    name={focused ? 'search-sharp' : 'search-outline'} 
+                    size={size ?? 24} 
+                    color={color ?? '#004D00'} 
+                />
             ),
           }}
         />
@@ -48,11 +51,12 @@ export default function TabLayout() {
           name="notifications"
           options={{
             title: 'Notifications',
-            tabBarIcon: ({ focused }) => (
-              <Image
-                source={focused ? require('@/assets/tab_bar/notification_active.png') : require('@/assets/tab_bar/notification.png')}
-                style={{ width: 24, height: 24 }}
-              />
+            tabBarIcon: ({ focused, color, size }) => (
+                <Ionicons 
+                    name={focused ? 'notifications' : 'notifications-outline'} 
+                    size={size ?? 24} 
+                    color={color ?? '#004D00'} 
+                />
             ),
           }}
         />
