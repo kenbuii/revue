@@ -69,17 +69,17 @@ const favoriteVues = [
 const recentRevues = [
   { 
     id: '1', 
-    title: 'NEVER LET ME GO, Chapter 4',
+    title: 'Never Let Me Go, Chapter 4',
     time: '4 days ago',
     content: 'suzanne collins got tired of us forgetting what fascism is... i\'m so tired of lorem epsom the lazy fox jumps over the moon and eats pie. Lorem Ipsum has been the industry\'s standard dum...',
-    cover: 'https://m.media-amazon.com/images/I/71kwkajubgL._AC_UF1000,1000_QL80_.jpg'
+    cover: 'https://m.media-amazon.com/images/I/71DgZ3LElXL.jpg'
   },
   { 
     id: '2', 
     title: 'Sunrise on the Reaping, Chapter 6',
     time: '4 days ago',
     content: 'suzanne collins got tired of us forgetting what fascism is... i\'m so tired of lorem epsom the lazy fox jumps over the moon and eats pie. Lorem Ipsum has been the industry\'s standard dum...',
-    cover: 'https://upload.wikimedia.org/wikipedia/en/f/f3/Hunger_games.jpg'
+    cover: 'https://prodimage.images-bn.com/pimages/9781546171461_p0_v5_s1200x630.jpg'
   },
 ];
 
@@ -103,8 +103,10 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <AppHeader rightComponent={<SettingsButton />} />
-      <ScrollView>
+      <View style={styles.headerContainer}>
+        <AppHeader rightComponent={<SettingsButton />} />
+      </View>
+      <ScrollView style={styles.scrollContent}>
         {/* Profile Info */}
         <View style={styles.profileContainer}>
           <View style={styles.profileInfo}>
@@ -142,9 +144,13 @@ export default function ProfileScreen() {
             contentContainerStyle={styles.horizontalScrollContent}
           >
             {onVueItems.map(item => (
-              <TouchableOpacity key={item.id} style={styles.mediaCard}>
+              <TouchableOpacity 
+                key={item.id} 
+                style={styles.mediaCard}
+                onPress={() => router.push('/media/1')}
+              >
                 <Image source={{ uri: item.cover }} style={styles.mediaCover} />
-                <Text style={styles.mediaAuthor}>{item.author}</Text>
+                <Text style={styles.mediaAuthor}>{item.title}</Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -159,9 +165,16 @@ export default function ProfileScreen() {
             contentContainerStyle={styles.horizontalScrollContent}
           >
             {favoriteVues.map(item => (
-              <TouchableOpacity key={item.id} style={styles.favoriteCard}>
-                <Image source={{ uri: item.cover }} style={styles.favoriteCover} />
-                <Text style={styles.favoriteComment}>{item.comment}</Text>
+              <TouchableOpacity 
+                key={item.id} 
+                style={styles.favoriteCard}
+                onPress={() => router.push('/media/1')}
+              >
+                <Image source={{ uri: item.cover }} style={styles.mediaCover} />
+                <Text style={styles.mediaAuthor}>{item.title}</Text>
+                <View style={styles.favoriteTextContainer}>
+                  <Text style={styles.favoriteComment}>{item.comment}</Text>
+                </View>
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -172,10 +185,16 @@ export default function ProfileScreen() {
           <Text style={styles.sectionTitle}>RECENT REVUES</Text>
           {recentRevues.map(revue => (
             <TouchableOpacity key={revue.id} style={styles.revueItem}>
-              <Image source={{ uri: revue.cover }} style={styles.revueCover} />
+              <View style={styles.revueImageContainer}>
+                <Image 
+                  source={{ uri: revue.cover }} 
+                  style={styles.revueCover}
+                  resizeMode="cover"
+                />
+              </View>
               <View style={styles.revueContent}>
                 <Text style={styles.revueTitle}>{revue.title}</Text>
-                <Text style={styles.revueText}>{revue.content}</Text>
+                <Text style={styles.revueText} numberOfLines={4}>{revue.content}</Text>
                 <Text style={styles.revueTime}>{revue.time}</Text>
               </View>
             </TouchableOpacity>
@@ -193,6 +212,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFDF6',
   },
+  headerContainer: {
+    backgroundColor: '#FFFDF6',
+    zIndex: 1,
+  },
+  scrollContent: {
+    flex: 1,
+  },
   settingsButton: {
     padding: 8,
     marginRight: -8,
@@ -204,16 +230,18 @@ const styles = StyleSheet.create({
   profileInfo: {
     flexDirection: 'row',
     alignItems: 'flex-start',
+    marginBottom: 10,
   },
   avatar: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
+    width: 85,
+    height: 85,
+    borderRadius: 42.5,
     marginRight: 15,
     backgroundColor: '#E1E1E1',
   },
   userInfo: {
     flex: 1,
+    justifyContent: 'center',
   },
   name: {
     fontSize: 15,
@@ -229,6 +257,7 @@ const styles = StyleSheet.create({
     color: '#333',
     lineHeight: 15,
     marginBottom: 7,
+    maxWidth: '100%',
   },
   statsContainer: {
     flexDirection: 'row',
@@ -252,7 +281,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   sectionTitle: {
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: 'bold',
     paddingHorizontal: 20,
     marginBottom: 10,
@@ -280,15 +309,17 @@ const styles = StyleSheet.create({
     width: 130,
     marginRight: 10,
   },
-  favoriteCover: {
-    width: 130,
-    height: 150,
+  favoriteTextContainer: {
+    backgroundColor: '#F8F6ED',
     borderRadius: 8,
-    marginBottom: 5,
+    padding: 8,
+    marginTop: 5,
+    borderWidth: 1,
+    borderColor: '#E8E8E8',
   },
   favoriteComment: {
     fontSize: 11,
-    color: '#666',
+    color: '#333',
     lineHeight: 14,
   },
   revueItem: {
@@ -296,30 +327,43 @@ const styles = StyleSheet.create({
     padding: 15,
     borderTopWidth: 1,
     borderTopColor: '#EFEFEF',
+    height: 130,
+    marginBottom: 10,
+  },
+  revueImageContainer: {
+    width: 60,
+    marginRight: 15,
+    borderRadius: 4,
+    overflow: 'hidden',
+    backgroundColor: '#F5F5F5',
+    height: '100%',
   },
   revueCover: {
-    width: 45,
-    height: 60,
-    borderRadius: 4,
-    marginRight: 15,
+    width: '100%',
+    height: '100%',
   },
   revueContent: {
     flex: 1,
+    justifyContent: 'space-between',
+    paddingBottom: 10,
   },
   revueTitle: {
     fontSize: 14,
     fontWeight: 'bold',
     marginBottom: 5,
+    height: 20,
   },
   revueText: {
     fontSize: 13,
     color: '#666',
     lineHeight: 18,
+    height: 72,
   },
   revueTime: {
     fontSize: 12,
     color: '#999',
     marginTop: 5,
+    height: 15,
   },
   spacer: {
     height: 80,

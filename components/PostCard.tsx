@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -23,16 +23,93 @@ interface Post {
   media: Media;
   date: string;
   title?: string;
-  contentType: 'image' | 'text';
+  contentType: 'image' | 'text' | 'mixed';
   content: string;
+  textContent?: string;
   commentCount: number;
   likeCount: number;
 }
 
 export default function PostCard({ post }: { post: Post }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [numberOfLines, setNumberOfLines] = useState<number | undefined>(4);
+
   const handleMediaPress = () => {
     console.log('Media pressed, navigating to media detail page');
     router.push('/media/1');
+  };
+
+  const toggleExpand = () => {
+    setIsExpanded(!isExpanded);
+    setNumberOfLines(isExpanded ? 4 : undefined);
+  };
+
+  const renderContent = () => {
+    if (post.contentType === 'image') {
+      return (
+        <View style={styles.imageContainer}>
+          <Image 
+            source={{ uri: post.content }} 
+            style={styles.contentImage} 
+            resizeMode="contain"
+          />
+        </View>
+      );
+    } else if (post.contentType === 'text') {
+      return (
+        <View>
+          <Text 
+            style={styles.contentText} 
+            numberOfLines={numberOfLines}
+            onTextLayout={({ nativeEvent: { lines } }) => {
+              if (lines.length > 4 && !isExpanded) {
+                setNumberOfLines(4);
+              }
+            }}
+          >
+            {post.content}
+          </Text>
+          {post.content.length > 0 && (
+            <TouchableOpacity onPress={toggleExpand} style={styles.readMoreButton}>
+              <Text style={styles.readMoreText}>
+                {isExpanded ? 'Show less' : 'Read more'}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      );
+    } else if (post.contentType === 'mixed') {
+      return (
+        <View>
+          <Text 
+            style={styles.contentText} 
+            numberOfLines={numberOfLines}
+            onTextLayout={({ nativeEvent: { lines } }) => {
+              if (lines.length > 4 && !isExpanded) {
+                setNumberOfLines(4);
+              }
+            }}
+          >
+            {post.textContent}
+          </Text>
+          {post.textContent && post.textContent.length > 0 && (
+            <TouchableOpacity onPress={toggleExpand} style={styles.readMoreButton}>
+              <Text style={styles.readMoreText}>
+                {isExpanded ? 'Show less' : 'Read more'}
+              </Text>
+            </TouchableOpacity>
+          )}
+          <View style={styles.imageContainer}>
+            <Image 
+              source={{ uri: post.content }} 
+              style={styles.contentImage} 
+              resizeMode="contain"
+            />
+          </View>
+        </View>
+      );
+    }
+    return null;
   };
 
   return (
@@ -67,11 +144,7 @@ export default function PostCard({ post }: { post: Post }) {
       
       {post.title && <Text style={styles.postTitle}>{post.title}</Text>}
       
-      {post.contentType === 'image' ? (
-        <Image source={{ uri: post.content }} style={styles.contentImage} resizeMode="cover" />
-      ) : (
-        <Text style={styles.contentText}>{post.content}</Text>
-      )}
+      {renderContent()}
       
       <View style={styles.actions}>
         <TouchableOpacity style={styles.actionButton}>
@@ -157,11 +230,16 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginBottom: 8,
   },
-  contentImage: {
+  imageContainer: {
     width: '100%',
-    height: 200,
+    aspectRatio: 1,
     borderRadius: 8,
     marginBottom: 10,
+  },
+  contentImage: {
+    width: '100%',
+    aspectRatio: 1,
+    borderRadius: 8,
   },
   contentText: {
     fontSize: 14,
@@ -186,5 +264,13 @@ const styles = StyleSheet.create({
   actionText: {
     color: '#666',
     fontSize: 14,
+  },
+  readMoreButton: {
+    marginTop: 4,
+  },
+  readMoreText: {
+    color: '#004D00',
+    fontSize: 14,
+    fontWeight: '500',
   },
 });

@@ -15,7 +15,7 @@ export const samplePosts = [
     date: 'September 10',
     title: 'Optional Post Title',
     contentType: 'image',
-    content: 'https://i.imgur.com/harry_potter_meme.jpg',
+    content: 'https://i.redd.it/enjoy-these-memes-i-have-accumulated-v0-gb6iosdq1zva1.jpg?width=640&format=pjpg&auto=webp&s=9f48ed18e3033d865815534bea65985d9a2b5248',
     likeCount: 5,
     commentCount: 3,
   },

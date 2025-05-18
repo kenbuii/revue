@@ -125,9 +125,11 @@ const PostCard = ({ post }: PostCardProps) => (
 export default function SearchScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
+      <View style={styles.headerContainer}>
+        <AppHeader showLogo={true} showSearchBar={true} />
+      </View>
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <ScrollView style={styles.container}>
-          <AppHeader showLogo={true} showSearchBar={true} />
+        <ScrollView style={styles.scrollContent}>
           <Text style={styles.sectionTitle}>Trending Now</Text>
           <View style={styles.trendingSection}>
             <TrendingHeader title="THE WHITE LOTUS" postCount="184" />
@@ -141,9 +143,9 @@ export default function SearchScreen() {
                 <PostCard key={post.id} post={post} />
                 ))}
             </ScrollView>
-        </View>
+          </View>
           
-        <View style={styles.trendingSection}>
+          <View style={styles.trendingSection}>
             <TrendingHeader title="THE WHITE LOTUS" postCount="184" />
 
             <ScrollView 
@@ -155,7 +157,7 @@ export default function SearchScreen() {
                 <PostCard key={post.id} post={post} />
                 ))}
             </ScrollView>
-        </View>
+          </View>
           
           {/* Placeholder for Supabase integration */}
           {/* TODO: Add Supabase query to fetch trending topics */}
@@ -172,9 +174,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFDF6',
   },
-  container: {
-    flex: 1,
+  headerContainer: {
     backgroundColor: '#FFFDF6',
+    zIndex: 1,
+  },
+  scrollContent: {
+    flex: 1,
   },
   sectionTitle: {
     fontSize: 22,
