@@ -15,6 +15,9 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
   const [loaded] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
+    LibreBaskerville_400Regular: require('../assets/fonts/LibreBaskerville-Regular.ttf'),
+    LibreBaskerville_400Regular_Italic: require('../assets/fonts/LibreBaskerville-Italic.ttf'),
+    LibreBaskerville_700Bold: require('../assets/fonts/LibreBaskerville-Bold.ttf'),
   });
 
   useEffect(() => {

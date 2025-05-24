@@ -32,7 +32,7 @@ export default function Step5GenreSelectScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-        <Text style={styles.backButtonText}>← Back</Text>
+        <Text style={styles.backButtonText}>←</Text>
       </TouchableOpacity>
       
       <View style={styles.contentContainer}>
@@ -49,6 +49,7 @@ export default function Step5GenreSelectScreen() {
               placeholder="Search"
               value={searchText}
               onChangeText={setSearchText}
+              placeholderTextColor="#8B9A7D"
             />
             <Text style={styles.searchIcon}>🔍</Text>
           </View>
@@ -106,7 +107,8 @@ const styles = StyleSheet.create({
   },
   backButtonText: {
     fontSize: 16,
-    color: '#333',
+    color: '#142D0A',
+    fontFamily: 'LibreBaskerville_400Regular',
   },
   contentContainer: {
     flex: 1,
@@ -122,20 +124,21 @@ const styles = StyleSheet.create({
   },
   pickText: {
     fontSize: 24,
-    color: '#333',
+    color: '#142D0A',
     marginBottom: 5,
+    fontFamily: 'LibreBaskerville_400Regular',
   },
   favoriteText: {
     fontSize: 36,
-    fontStyle: 'italic',
-    color: '#333',
+    color: '#142D0A',
     fontWeight: '300',
     marginBottom: 10,
+    fontFamily: 'LibreBaskerville_400Regular_Italic',
   },
   subtitle: {
     fontSize: 16,
-    color: '#666',
-    fontStyle: 'italic',
+    color: '#142D0A',
+    fontFamily: 'LibreBaskerville_400Regular_Italic',
   },
   searchContainer: {
     position: 'relative',
@@ -148,6 +151,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingRight: 50,
     fontSize: 16,
+    borderWidth: 1.84,
+    borderColor: '#142D0A',
+    color: '#142D0A',
+    fontFamily: 'LibreBaskerville_400Regular',
   },
   searchIcon: {
     position: 'absolute',
@@ -161,9 +168,10 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     fontWeight: '500',
-    color: '#333',
+    color: '#142D0A',
     marginBottom: 20,
     textAlign: 'center',
+    fontFamily: 'LibreBaskerville_700Bold',
   },
   grid: {
     flexDirection: 'row',
@@ -177,10 +185,12 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 10,
     justifyContent: 'flex-end',
+    borderWidth: 1.84,
+    borderColor: '#142D0A',
   },
   selectedItem: {
     borderWidth: 3,
-    borderColor: '#6B7280',
+    borderColor: '#142D0A',
   },
   itemContent: {
     alignItems: 'center',
@@ -188,16 +198,17 @@ const styles = StyleSheet.create({
   itemTitle: {
     fontSize: 12,
     fontWeight: '500',
-    color: '#333',
+    color: '#142D0A',
     textAlign: 'center',
+    fontFamily: 'LibreBaskerville_700Bold',
   },
   bottomText: {
     fontSize: 14,
-    color: '#666',
-    fontStyle: 'italic',
+    color: '#142D0A',
     textAlign: 'center',
     marginBottom: 40,
     lineHeight: 20,
+    fontFamily: 'LibreBaskerville_400Regular_Italic',
   },
   nextButtonContainer: {
     paddingHorizontal: 40,
@@ -205,14 +216,17 @@ const styles = StyleSheet.create({
     paddingTop: 20,
   },
   nextButton: {
-    backgroundColor: '#6B7280',
+    backgroundColor: '#142D0A',
     borderRadius: 25,
     paddingVertical: 16,
     alignItems: 'center',
+    borderWidth: 1.84,
+    borderColor: '#142D0A',
   },
   nextButtonText: {
     color: 'white',
     fontSize: 16,
     fontWeight: '500',
+    fontFamily: 'LibreBaskerville_700Bold',
   },
 });

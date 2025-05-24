@@ -14,37 +14,46 @@ export default function Step3DisplayNameScreen() {
     router.back();
   };
 
+  const isFormValid = displayName.trim().length > 0;
+
   return (
     <SafeAreaView style={styles.container}>
       <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-        <Text style={styles.backButtonText}>← Back</Text>
+        <Text style={styles.backButtonText}>←</Text>
       </TouchableOpacity>
       
-      <View style={styles.content}>
-        <View style={styles.header}>
-          <Text style={styles.welcomeText}>Welcome to</Text>
-          <Text style={styles.title}>revue</Text>
-        </View>
-        
-        <View style={styles.avatarContainer}>
-          <View style={styles.avatar}>
-            <View style={styles.avatarPlaceholder} />
+      <View style={styles.contentContainer}>
+        <View style={styles.content}>
+          <View style={styles.header}>
+            <Text style={styles.welcomeText}>Welcome to</Text>
+            <Text style={styles.title}>revue</Text>
+          </View>
+          
+          <View style={styles.avatarContainer}>
+            <View style={styles.avatar}>
+              <View style={styles.avatarPlaceholder} />
+            </View>
+          </View>
+          
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Display name:</Text>
+            <TextInput
+              style={styles.input}
+              value={displayName}
+              onChangeText={setDisplayName}
+              placeholder="Enter display name"
+              placeholderTextColor="#8B9A7D"
+            />
           </View>
         </View>
         
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Display name:</Text>
-          <TextInput
-            style={styles.input}
-            value={displayName}
-            onChangeText={setDisplayName}
-            placeholder="Enter display name"
-          />
-        </View>
-        
-        <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
-          <Text style={styles.nextButtonText}>Next</Text>
-        </TouchableOpacity>
+        {isFormValid && (
+          <View style={styles.nextButtonContainer}>
+            <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
+              <Text style={styles.nextButtonText}>Next</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
     </SafeAreaView>
   );
@@ -64,7 +73,11 @@ const styles = StyleSheet.create({
   },
   backButtonText: {
     fontSize: 16,
-    color: '#333',
+    color: '#142D0A',
+    fontFamily: 'LibreBaskerville_400Regular',
+  },
+  contentContainer: {
+    flex: 1,
   },
   content: {
     flex: 1,
@@ -77,14 +90,15 @@ const styles = StyleSheet.create({
   },
   welcomeText: {
     fontSize: 18,
-    color: '#333',
+    color: '#142D0A',
     marginBottom: 5,
+    fontFamily: 'LibreBaskerville_400Regular',
   },
   title: {
     fontSize: 48,
-    fontStyle: 'italic',
-    color: '#333',
+    color: '#142D0A',
     fontWeight: '300',
+    fontFamily: 'LibreBaskerville_400Regular_Italic',
   },
   avatarContainer: {
     alignItems: 'center',
@@ -97,6 +111,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#A3A3A3',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1.84,
+    borderColor: '#142D0A',
   },
   avatarPlaceholder: {
     width: 50,
@@ -110,7 +126,8 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 16,
-    color: '#333',
+    color: '#142D0A',
+    fontFamily: 'LibreBaskerville_400Regular',
   },
   input: {
     backgroundColor: 'white',
@@ -118,20 +135,28 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 20,
     fontSize: 16,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderWidth: 1.84,
+    borderColor: '#142D0A',
+    color: '#142D0A',
+    fontFamily: 'LibreBaskerville_400Regular',
+  },
+  nextButtonContainer: {
+    paddingHorizontal: 40,
+    paddingBottom: 40,
+    paddingTop: 20,
   },
   nextButton: {
-    backgroundColor: '#6B7280',
+    backgroundColor: '#142D0A',
     borderRadius: 25,
     paddingVertical: 16,
     alignItems: 'center',
-    marginTop: 'auto',
-    marginBottom: 40,
+    borderWidth: 1.84,
+    borderColor: '#142D0A',
   },
   nextButtonText: {
     color: 'white',
     fontSize: 16,
     fontWeight: '500',
+    fontFamily: 'LibreBaskerville_700Bold',
   },
 });

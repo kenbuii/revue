@@ -59,10 +59,10 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 48,
-    fontStyle: 'italic',
-    color: '#333',
+    color: '#142D0A',
     marginBottom: 80,
     fontWeight: '300',
+    fontFamily: 'LibreBaskerville_400Regular_Italic',
   },
   buttonContainer: {
     width: '100%',
@@ -76,18 +76,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderWidth: 1.84,
+    borderColor: '#142D0A',
     gap: 10,
   },
   googleButtonText: {
     fontSize: 16,
-    color: '#333',
+    color: '#142D0A',
+    fontFamily: 'LibreBaskerville_400Regular',
   },
   googleText: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#4285F4',
+    fontFamily: 'LibreBaskerville_700Bold',
   },
   usernameButton: {
     backgroundColor: 'white',
@@ -96,12 +98,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderWidth: 1.84,
+    borderColor: '#142D0A',
   },
   usernameButtonText: {
     fontSize: 16,
-    color: '#333',
+    color: '#142D0A',
+    fontFamily: 'LibreBaskerville_400Regular',
   },
   signUpContainer: {
     flexDirection: 'row',
@@ -110,13 +113,15 @@ const styles = StyleSheet.create({
   },
   signUpText: {
     fontSize: 14,
-    color: '#666',
+    color: '#142D0A',
     fontStyle: 'italic',
+    fontFamily: 'LibreBaskerville_400Regular_Italic',
   },
   signUpLink: {
     fontSize: 14,
-    color: '#666',
+    color: '#142D0A',
     fontStyle: 'italic',
     textDecorationLine: 'underline',
+    fontFamily: 'LibreBaskerville_400Regular_Italic',
   },
 });

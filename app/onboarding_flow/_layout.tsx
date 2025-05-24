@@ -11,6 +11,7 @@ export default function OnboardingLayout() {
         <Stack.Screen name="step4_contactsync" />
         <Stack.Screen name="step5_genreselect" />
         <Stack.Screen name="step6_final" />
+        <Stack.Screen name="sync_contacts" />
       </Stack>
       <StatusBar style="auto" />
     </>
