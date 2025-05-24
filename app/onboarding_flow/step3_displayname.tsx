@@ -14,12 +14,22 @@ export default function Step3DisplayNameScreen() {
     router.back();
   };
 
+  // TODO: remove before deploying - test navigation button
+  const handleTestNext = () => {
+    router.push('/onboarding_flow/step4_contactsync');
+  };
+
   const isFormValid = displayName.trim().length > 0;
 
   return (
     <SafeAreaView style={styles.container}>
       <TouchableOpacity style={styles.backButton} onPress={handleBack}>
         <Text style={styles.backButtonText}>←</Text>
+      </TouchableOpacity>
+      
+      {/* TODO: remove before deploying - test navigation button */}
+      <TouchableOpacity style={styles.testButton} onPress={handleTestNext}>
+        <Text style={styles.testButtonText}>TEST →</Text>
       </TouchableOpacity>
       
       <View style={styles.contentContainer}>
@@ -75,6 +85,21 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#142D0A',
     fontFamily: 'LibreBaskerville_400Regular',
+  },
+  testButton: {
+    position: 'absolute',
+    top: 60,
+    right: 20,
+    zIndex: 1,
+    backgroundColor: '#FF6B6B',
+    borderRadius: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  testButtonText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
   contentContainer: {
     flex: 1,
