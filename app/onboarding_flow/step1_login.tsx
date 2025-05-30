@@ -74,34 +74,20 @@ export default function Step1LoginScreen() {
   };
 
   const handleSignUp = async () => {
-    // For testing, create a demo account with timestamp
+    // For testing navigation flow only - no actual account creation
     setIsSigningIn(true);
     
     try {
-      const timestamp = Date.now();
-      // Use a standard domain that Supabase will accept
-      const email = `test${timestamp}@example.com`;
-      const username = `test_user_${timestamp}`;
+      console.log('🔄 Navigating to step 2 (no account creation)...');
       
-      console.log(`🔄 Creating test account: ${email}`);
+      // Simulate a brief loading state then navigate
+      await new Promise(resolve => setTimeout(resolve, 500));
       
-      const result = await signUp(email, 'demo123', username);
-      
-      if (result.success) {
-        console.log('✅ Demo signup successful');
-        Alert.alert(
-          'Account Created!', 
-          `✅ Test account created: ${email}\n\nThis account should work for login. You can now continue with onboarding.`
-        );
-        // Navigate to next step
-        router.push('/onboarding_flow/step2_username');
-      } else {
-        console.error('❌ Signup failed:', result.error);
-        Alert.alert('Signup Failed', `${result.error}\n\nCheck your Supabase configuration.`);
-      }
+      console.log('✅ Navigating to onboarding step 2');
+      router.replace('/onboarding_flow/step2_username');
     } catch (error) {
-      console.error('Signup error:', error);
-      Alert.alert('Signup Error', 'An unexpected error occurred');
+      console.error('Navigation error:', error);
+      Alert.alert('Navigation Error', 'An unexpected error occurred');
     } finally {
       setIsSigningIn(false);
     }
@@ -139,17 +125,8 @@ export default function Step1LoginScreen() {
             {isSigningIn ? (
               <ActivityIndicator size="small" color="white" />
             ) : (
-              <Text style={styles.signupButtonText}>Create Test Account</Text>
+              <Text style={styles.signupButtonText}>Create Account</Text>
             )}
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={[styles.googleButton, loading && styles.disabledButton]} 
-            onPress={handleContinueWithGoogle}
-            disabled={loading}
-          >
-            <Text style={styles.googleButtonText}>Continue with</Text>
-            <Text style={styles.googleText}>Google</Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
@@ -160,7 +137,7 @@ export default function Step1LoginScreen() {
             {isSigningIn ? (
               <ActivityIndicator size="small" color="#142D0A" />
             ) : (
-              <Text style={styles.usernameButtonText}>Test Login (demo@example.com)</Text>
+              <Text style={styles.usernameButtonText}>Login [TEST]</Text>
             )}
           </TouchableOpacity>
         </View>
