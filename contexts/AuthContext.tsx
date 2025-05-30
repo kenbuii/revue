@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { Session, User } from '@supabase/supabase-js';
-import { supabase } from '@/lib/supabase';
+import { Session, User } from '@supabase/auth-js';
+import { supabaseAuth } from '@/lib/supabase';
 import { authService, AuthState } from '@/lib/auth';
 
 interface AuthContextType extends AuthState {
@@ -67,8 +67,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     initializeAuth();
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+    const { data: { subscription } } = supabaseAuth.onAuthStateChange(
+      async (event: any, session: Session | null) => {
         console.log('Auth state changed:', event, session ? 'Session exists' : 'No session');
         
         if (mounted) {

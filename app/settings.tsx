@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import AppHeader from '@/components/AppHeader';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface NotificationSettings {
   newFollowers: boolean;
@@ -18,6 +19,7 @@ interface NotificationToggleProps {
 }
 
 export default function SettingsScreen() {
+  const { signOut } = useAuth();
   const [notifications, setNotifications] = useState<NotificationSettings>({
     newFollowers: true,
     newComments: true,
@@ -44,9 +46,20 @@ export default function SettingsScreen() {
         {
           text: 'Logout',
           style: 'destructive',
-          onPress: () => {
-            // TODO: Implement logout logic with Supabase
-            router.replace('/');
+          onPress: async () => {
+            try {
+              const result = await signOut();
+              
+              if (result.success) {
+                // Redirect to login screen after successful logout
+                router.replace('/onboarding_flow/step1_login');
+              } else {
+                Alert.alert('Logout Failed', result.error || 'Failed to logout. Please try again.');
+              }
+            } catch (error) {
+              console.error('Logout error:', error);
+              Alert.alert('Logout Error', 'An unexpected error occurred during logout.');
+            }
           },
         },
       ],

@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/contexts/AuthContext';
 
 export default function Step1LoginScreen() {
-  const { signIn, signUp, testConnection, loading } = useAuth();
+  const { signIn, signUp, testConnection, loading, hasCompletedOnboarding } = useAuth();
   const [connectionTested, setConnectionTested] = useState(false);
   const [isSigningIn, setIsSigningIn] = useState(false);
 
@@ -38,21 +38,36 @@ export default function Step1LoginScreen() {
     setIsSigningIn(true);
     
     try {
+      console.log('🔄 Attempting login with demo@example.com...');
+      
       // Demo account for testing - this will fail if account doesn't exist
-      const result = await signIn('demo@revue.app', 'demo123');
+      const result = await signIn('demo@example.com', 'myfirst123');
       
       if (result.success) {
         console.log('✅ Demo login successful');
-        // Auth context will handle navigation
+        
+        // Check if user has completed onboarding
+        const onboardingCompleted = await hasCompletedOnboarding();
+        
+        if (onboardingCompleted) {
+          // User has completed onboarding, go to main app
+          console.log('📍 Routing to main app (onboarding completed)');
+          router.replace('/(tabs)');
+        } else {
+          // User needs to complete onboarding
+          console.log('📍 Routing to onboarding step 2 (onboarding incomplete)');
+          router.replace('/onboarding_flow/step2_username');
+        }
       } else {
+        console.error('❌ Login failed:', result.error);
         Alert.alert(
           'Login Failed', 
-          `${result.error}\n\nTip: Try "Sign up" first to create a test account, or create demo@revue.app in your Supabase dashboard.`
+          `${result.error}\n\n🔧 Debug tip: Try the "Create Test Account" button first - this creates a proper authenticated user.`
         );
       }
     } catch (error) {
-      Alert.alert('Login Error', 'An unexpected error occurred');
       console.error('Login error:', error);
+      Alert.alert('Login Error', 'An unexpected error occurred');
     } finally {
       setIsSigningIn(false);
     }
@@ -64,10 +79,11 @@ export default function Step1LoginScreen() {
     
     try {
       const timestamp = Date.now();
-      const email = `test${timestamp}@revue.app`;
+      // Use a standard domain that Supabase will accept
+      const email = `test${timestamp}@example.com`;
       const username = `test_user_${timestamp}`;
       
-      console.log(`Creating test account: ${email}`);
+      console.log(`🔄 Creating test account: ${email}`);
       
       const result = await signUp(email, 'demo123', username);
       
@@ -75,16 +91,17 @@ export default function Step1LoginScreen() {
         console.log('✅ Demo signup successful');
         Alert.alert(
           'Account Created!', 
-          `Test account created: ${email}\nYou can now continue with onboarding.`
+          `✅ Test account created: ${email}\n\nThis account should work for login. You can now continue with onboarding.`
         );
         // Navigate to next step
         router.push('/onboarding_flow/step2_username');
       } else {
-        Alert.alert('Signup Failed', result.error || 'Unknown error');
+        console.error('❌ Signup failed:', result.error);
+        Alert.alert('Signup Failed', `${result.error}\n\nCheck your Supabase configuration.`);
       }
     } catch (error) {
-      Alert.alert('Signup Error', 'An unexpected error occurred');
       console.error('Signup error:', error);
+      Alert.alert('Signup Error', 'An unexpected error occurred');
     } finally {
       setIsSigningIn(false);
     }
@@ -115,6 +132,18 @@ export default function Step1LoginScreen() {
         
         <View style={styles.buttonContainer}>
           <TouchableOpacity 
+            style={[styles.signupButton, loading && styles.disabledButton]} 
+            onPress={handleSignUp}
+            disabled={loading || isSigningIn}
+          >
+            {isSigningIn ? (
+              <ActivityIndicator size="small" color="white" />
+            ) : (
+              <Text style={styles.signupButtonText}>Create Test Account</Text>
+            )}
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
             style={[styles.googleButton, loading && styles.disabledButton]} 
             onPress={handleContinueWithGoogle}
             disabled={loading}
@@ -131,19 +160,15 @@ export default function Step1LoginScreen() {
             {isSigningIn ? (
               <ActivityIndicator size="small" color="#142D0A" />
             ) : (
-              <Text style={styles.usernameButtonText}>Test Login (demo@revue.app)</Text>
+              <Text style={styles.usernameButtonText}>Test Login (demo@example.com)</Text>
             )}
           </TouchableOpacity>
         </View>
         
-        <View style={styles.signUpContainer}>
-          <Text style={styles.signUpText}>Need a test account? </Text>
-          <TouchableOpacity 
-            onPress={handleSignUp}
-            disabled={loading || isSigningIn}
-          >
-            <Text style={styles.signUpLink}>Create one here!</Text>
-          </TouchableOpacity>
+        <View style={styles.infoContainer}>
+          <Text style={styles.infoText}>
+            🔧 For testing: Use "Create Test Account" (recommended) or try demo@example.com if manually created
+          </Text>
         </View>
       </View>
     </SafeAreaView>
@@ -207,6 +232,21 @@ const styles = StyleSheet.create({
     width: '100%',
     gap: 20,
   },
+  signupButton: {
+    backgroundColor: 'white',
+    borderRadius: 25,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.84,
+    borderColor: '#142D0A',
+  },
+  signupButtonText: {
+    fontSize: 16,
+    color: '#142D0A',
+    fontFamily: 'LibreBaskerville_400Regular',
+  },
   googleButton: {
     backgroundColor: 'white',
     borderRadius: 25,
@@ -248,20 +288,16 @@ const styles = StyleSheet.create({
   disabledButton: {
     opacity: 0.6,
   },
-  signUpContainer: {
-    flexDirection: 'row',
+  infoContainer: {
     marginTop: 40,
     alignItems: 'center',
+    paddingHorizontal: 20,
   },
-  signUpText: {
-    fontSize: 14,
-    color: '#142D0A',
+  infoText: {
+    fontSize: 12,
+    color: '#666',
     fontFamily: 'LibreBaskerville_400Regular_Italic',
-  },
-  signUpLink: {
-    fontSize: 14,
-    color: '#142D0A',
-    textDecorationLine: 'underline',
-    fontFamily: 'LibreBaskerville_400Regular_Italic',
+    textAlign: 'center',
+    lineHeight: 16,
   },
 });

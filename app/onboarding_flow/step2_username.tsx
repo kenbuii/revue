@@ -1,14 +1,32 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function Step2UsernameScreen() {
-  const [displayName, setDisplayName] = useState('');
+  const { user, saveOnboardingData, getOnboardingData } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
 
-  const handleNext = () => {
+  // Load existing data and show user info
+  useEffect(() => {
+    const loadData = async () => {
+      const data = await getOnboardingData();
+      if (data.username) setUsername(data.username);
+      if (data.password) setPassword(data.password);
+    };
+    loadData();
+  }, [getOnboardingData]);
+
+  const handleNext = async () => {
+    // Save onboarding data
+    await saveOnboardingData({
+      username,
+      password,
+      step: 2
+    });
+    
     router.push('/onboarding_flow/step3_displayname');
   };
 
@@ -39,20 +57,12 @@ export default function Step2UsernameScreen() {
           <View style={styles.header}>
             <Text style={styles.welcomeText}>Welcome to</Text>
             <Text style={styles.title}>revue</Text>
+            {user && (
+              <Text style={styles.userInfo}>Logged in as: {user.email}</Text>
+            )}
           </View>
           
           <View style={styles.formContainer}>
-            {/* <View style={styles.inputGroup}>
-              <Text style={styles.label}>Display name:</Text>
-              <TextInput
-                style={styles.input}
-                value={displayName}
-                onChangeText={setDisplayName}
-                placeholder="Enter display name"
-                placeholderTextColor="#8B9A7D"
-              />
-            </View> */}
-            
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Username:</Text>
               <TextInput
@@ -145,6 +155,12 @@ const styles = StyleSheet.create({
     fontSize: 48,
     color: '#142D0A',
     fontWeight: '300',
+    fontFamily: 'LibreBaskerville_400Regular_Italic',
+    marginBottom: 10,
+  },
+  userInfo: {
+    fontSize: 12,
+    color: '#666',
     fontFamily: 'LibreBaskerville_400Regular_Italic',
   },
   formContainer: {

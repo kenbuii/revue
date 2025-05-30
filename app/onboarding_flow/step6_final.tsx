@@ -1,10 +1,33 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function Step6FinalScreen() {
-  const handleBeginRevueing = () => {
+  const { user, completeOnboarding, getOnboardingData } = useAuth();
+  const [displayName, setDisplayName] = useState('[USER]');
+
+  // Load onboarding data to personalize the welcome
+  useEffect(() => {
+    const loadData = async () => {
+      const data = await getOnboardingData();
+      if (data.displayName) {
+        setDisplayName(data.displayName);
+      } else if (user?.email) {
+        // Fallback to email username part
+        setDisplayName(user.email.split('@')[0]);
+      }
+    };
+    loadData();
+  }, [getOnboardingData, user]);
+
+  const handleBeginRevueing = async () => {
+    // Mark onboarding as completed
+    await completeOnboarding();
+    
+    console.log('🎉 Onboarding completed! Navigating to main app...');
+    
     // Navigate to main app (tabs)
     router.replace('/(tabs)');
   };
@@ -44,7 +67,10 @@ export default function Step6FinalScreen() {
           <View style={styles.header}>
             <Text style={styles.welcomeText}>Welcome to</Text>
             <Text style={styles.title}>revue,</Text>
-            <Text style={styles.username}>[USER]!</Text>
+            <Text style={styles.username}>{displayName}!</Text>
+            {user && (
+              <Text style={styles.userInfo}>Setup complete ✅</Text>
+            )}
           </View>
           
           <TouchableOpacity style={styles.beginButton} onPress={handleBeginRevueing}>
@@ -159,6 +185,12 @@ const styles = StyleSheet.create({
     color: '#142D0A',
     fontWeight: '500',
     fontFamily: 'LibreBaskerville_700Bold',
+    marginBottom: 10,
+  },
+  userInfo: {
+    fontSize: 12,
+    color: '#28a745',
+    fontFamily: 'LibreBaskerville_400Regular_Italic',
   },
   beginButton: {
     backgroundColor: '#142D0A',

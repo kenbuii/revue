@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Share, Alert } from 'react-native';
+import Contacts from 'expo-contacts';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 

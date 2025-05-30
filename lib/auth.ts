@@ -1,6 +1,6 @@
-import { supabase } from './supabase';
+import { supabaseAuth } from './supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Session, User, AuthError } from '@supabase/supabase-js';
+import { Session, User } from '@supabase/auth-js';
 
 // Types for our auth service
 export interface AuthUser {
@@ -49,7 +49,7 @@ class AuthService {
       console.log('🔄 Testing Supabase connection...');
       
       // Test basic connection by getting session
-      const { data, error } = await supabase.auth.getSession();
+      const { data, error } = await supabaseAuth.getSession();
       
       if (error) {
         console.log('⚠️ Auth error (normal for unauthenticated users):', error.message);
@@ -73,26 +73,26 @@ class AuthService {
   /**
    * Get current session
    */
-  async getCurrentSession(): Promise<{ session: Session | null; error?: AuthError | null }> {
+  async getCurrentSession(): Promise<{ session: Session | null; error?: any }> {
     try {
-      const { data, error } = await supabase.auth.getSession();
+      const { data, error } = await supabaseAuth.getSession();
       return { session: data.session, error };
     } catch (err) {
       console.error('Error getting current session:', err);
-      return { session: null, error: err as AuthError };
+      return { session: null, error: err };
     }
   }
 
   /**
    * Get current user
    */
-  async getCurrentUser(): Promise<{ user: User | null; error?: AuthError | null }> {
+  async getCurrentUser(): Promise<{ user: User | null; error?: any }> {
     try {
-      const { data, error } = await supabase.auth.getUser();
+      const { data, error } = await supabaseAuth.getUser();
       return { user: data.user, error };
     } catch (err) {
       console.error('Error getting current user:', err);
-      return { user: null, error: err as AuthError };
+      return { user: null, error: err };
     }
   }
 
@@ -102,12 +102,14 @@ class AuthService {
   async signUp(signUpData: SignUpData): Promise<{ 
     user: User | null; 
     session: Session | null; 
-    error?: AuthError 
+    error?: any 
   }> {
     try {
       console.log('🔄 Signing up user...');
+      console.log('📧 Email:', signUpData.email);
+      console.log('👤 Username:', signUpData.username);
       
-      const { data, error } = await supabase.auth.signUp({
+      const { data, error } = await supabaseAuth.signUp({
         email: signUpData.email,
         password: signUpData.password,
         options: {
@@ -118,18 +120,26 @@ class AuthService {
       });
 
       if (error) {
-        console.error('❌ Sign up error:', error.message);
+        console.error('❌ Sign up error details:');
+        console.error('- Message:', error.message);
+        console.error('- Status:', error.status);
+        console.error('- Full error:', JSON.stringify(error, null, 2));
         return { user: null, session: null, error };
       }
 
       console.log('✅ User signed up successfully');
+      console.log('📊 Response data:', {
+        user: data.user ? 'User created' : 'No user',
+        session: data.session ? 'Session created' : 'No session'
+      });
+      
       return { user: data.user, session: data.session, error: undefined };
     } catch (err) {
-      console.error('Sign up failed:', err);
+      console.error('💥 Sign up failed with exception:', err);
       return { 
         user: null, 
         session: null, 
-        error: err as AuthError 
+        error: err 
       };
     }
   }
@@ -140,12 +150,12 @@ class AuthService {
   async signIn(signInData: SignInData): Promise<{ 
     user: User | null; 
     session: Session | null; 
-    error?: AuthError 
+    error?: any 
   }> {
     try {
       console.log('🔄 Signing in user...');
       
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabaseAuth.signInWithPassword({
         email: signInData.email,
         password: signInData.password,
       });
@@ -162,7 +172,7 @@ class AuthService {
       return { 
         user: null, 
         session: null, 
-        error: err as AuthError 
+        error: err 
       };
     }
   }
@@ -170,11 +180,11 @@ class AuthService {
   /**
    * Sign out current user
    */
-  async signOut(): Promise<{ error?: AuthError }> {
+  async signOut(): Promise<{ error?: any }> {
     try {
       console.log('🔄 Signing out user...');
       
-      const { error } = await supabase.auth.signOut();
+      const { error } = await supabaseAuth.signOut();
       
       if (error) {
         console.error('❌ Sign out error:', error.message);
@@ -188,7 +198,7 @@ class AuthService {
       return { error: undefined };
     } catch (err) {
       console.error('Sign out failed:', err);
-      return { error: err as AuthError };
+      return { error: err };
     }
   }
 
