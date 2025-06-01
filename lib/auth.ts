@@ -1,6 +1,7 @@
 import { supabaseAuth } from './supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Session, User } from '@supabase/auth-js';
+import * as CryptoJS from 'crypto-js';
 
 // Types for our auth service
 export interface AuthUser {
@@ -41,6 +42,13 @@ export interface AuthState {
 
 // Auth service class
 class AuthService {
+  /**
+   * Hash email for contact sync privacy
+   */
+  private hashEmail(email: string): string {
+    return CryptoJS.SHA256(email.toLowerCase().trim()).toString();
+  }
+
   /**
    * Test Supabase connection
    */
@@ -115,6 +123,7 @@ class AuthService {
         options: {
           data: {
             username: signUpData.username,
+            email_hash: this.hashEmail(signUpData.email),
           }
         }
       });
