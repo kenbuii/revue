@@ -27,10 +27,6 @@ export default function Step1LoginScreen() {
     testSupabaseConnection();
   }, [testConnection]);
 
-  const handleContinueWithGoogle = () => {
-    // TODO: Implement Google OAuth in Phase 4
-    Alert.alert('Coming Soon', 'Google login will be implemented in Phase 4');
-  };
 
   const handleLoginWithUsername = () => {
     // Navigate to login form for existing users
@@ -58,9 +54,9 @@ export default function Step1LoginScreen() {
       )}
       
       {/* TODO: remove before deploying - test navigation button */}
-      <TouchableOpacity style={styles.testButton} onPress={handleTestNext}>
+      {/* <TouchableOpacity style={styles.testButton} onPress={handleTestNext}>
         <Text style={styles.testButtonText}>TEST →</Text>
-      </TouchableOpacity>
+      </TouchableOpacity> */}
       
       <View style={styles.content}>
         <Text style={styles.title}>revue</Text>

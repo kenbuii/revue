@@ -2,6 +2,7 @@ import { supabaseAuth } from './supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Session, User } from '@supabase/auth-js';
 import * as CryptoJS from 'crypto-js';
+import Constants from 'expo-constants';
 
 // Types for our auth service
 export interface AuthUser {
@@ -43,7 +44,7 @@ export interface AuthState {
 // Auth service class
 class AuthService {
   /**
-   * Hash email for contact sync privacy
+   * Hash email for privacy-friendly storage
    */
   private hashEmail(email: string): string {
     return CryptoJS.SHA256(email.toLowerCase().trim()).toString();
@@ -257,6 +258,7 @@ class AuthService {
         onboardingData.email || 
         onboardingData.displayName || 
         onboardingData.selectedGenres?.length > 0 ||
+        onboardingData.selectedMedia?.length > 0 ||
         onboardingData.step >= 4  // Made it to genre selection or beyond
       );
 
@@ -300,6 +302,15 @@ class AuthService {
   async completeOnboarding(): Promise<{ success: boolean; error?: string }> {
     try {
       await AsyncStorage.setItem('onboarding_completed', 'true');
+      
+      // Also save to Supabase if user is authenticated
+      const { session } = await this.getCurrentSession();
+      if (session?.user) {
+        await this.saveToSupabase(session.user.id, { 
+          onboarding_completed: true 
+        });
+      }
+      
       console.log('✅ Onboarding marked as completed');
       return { success: true };
     } catch (err) {
@@ -325,16 +336,114 @@ class AuthService {
   }
 
   /**
-   * Save onboarding data to local storage
+   * Save onboarding data to Supabase using HTTP requests (WebSocket-safe)
+   */
+  private async saveToSupabase(userId: string, data: any): Promise<void> {
+    try {
+      const supabaseUrl = Constants.expoConfig?.extra?.supabaseUrl;
+      const supabaseAnonKey = Constants.expoConfig?.extra?.supabaseAnonKey;
+      
+      if (!supabaseUrl || !supabaseAnonKey) {
+        console.log('🔧 Supabase configuration missing - skipping remote save');
+        return;
+      }
+
+      // Get auth token
+      const { session } = await this.getCurrentSession();
+      const token = session?.access_token || supabaseAnonKey;
+
+      // Prepare data for Supabase function
+      const payload: any = {
+        target_user_id: userId,
+      };
+
+      // Map local data to Supabase fields
+      if (data.displayName) payload.p_display_name = data.displayName;
+      if (data.profileImageUrl) payload.p_avatar_url = data.profileImageUrl;
+      if (data.onboarding_completed !== undefined) payload.p_onboarding_completed = data.onboarding_completed;
+      if (data.contactsSynced !== undefined) payload.p_contact_sync_enabled = data.contactsSynced;
+      
+      // Handle media preferences
+      if (data.selectedMedia && Array.isArray(data.selectedMedia)) {
+        payload.p_media_preferences = data.selectedMedia;
+      }
+
+      console.log('💾 Saving onboarding data to Supabase...');
+
+      const response = await fetch(`${supabaseUrl}/rest/v1/rpc/save_user_onboarding_data`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': supabaseAnonKey,
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.text();
+        console.error('❌ Supabase save error:', response.status, errorData);
+        // Don't throw - graceful degradation
+        return;
+      }
+
+      const result = await response.json();
+      console.log('✅ Onboarding data saved to Supabase:', result);
+
+    } catch (error) {
+      console.error('❌ Error saving to Supabase:', error);
+      // Don't throw - graceful degradation, local storage still works
+    }
+  }
+
+  /**
+   * Save onboarding data to both local storage and Supabase
    */
   async saveOnboardingData(data: any): Promise<void> {
     try {
+      // 1. Save to local storage (for offline access and immediate availability)
       const existingData = await this.getOnboardingData();
       const updatedData = { ...existingData, ...data };
       await AsyncStorage.setItem('onboarding_data', JSON.stringify(updatedData));
-      console.log('💾 Onboarding data saved:', updatedData);
+      console.log('💾 Onboarding data saved locally:', updatedData);
+
+      // 2. Save to Supabase (for persistence and cross-device sync)
+      const { session } = await this.getCurrentSession();
+      if (session?.user) {
+        await this.saveToSupabase(session.user.id, updatedData);
+      } else {
+        console.log('📡 No active session - skipping Supabase save (will sync when user logs in)');
+      }
+
     } catch (err) {
       console.error('Error saving onboarding data:', err);
+      // Don't throw - at least local storage might have worked
+    }
+  }
+
+  /**
+   * Sync local onboarding data to Supabase (called after login)
+   */
+  async syncOnboardingDataToSupabase(): Promise<void> {
+    try {
+      const { session } = await this.getCurrentSession();
+      if (!session?.user) {
+        console.log('📡 No active session - cannot sync to Supabase');
+        return;
+      }
+
+      const localData = await this.getOnboardingData();
+      if (Object.keys(localData).length === 0) {
+        console.log('📡 No local onboarding data to sync');
+        return;
+      }
+
+      console.log('🔄 Syncing local onboarding data to Supabase...');
+      await this.saveToSupabase(session.user.id, localData);
+      
+    } catch (error) {
+      console.error('❌ Error syncing onboarding data to Supabase:', error);
+      // Don't throw - graceful degradation
     }
   }
 }

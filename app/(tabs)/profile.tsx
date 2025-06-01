@@ -4,6 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AppHeader from '@/components/AppHeader';
 import { router } from 'expo-router';
+import { useBookmarks } from '@/contexts/BookmarksContext';
 
 // Mock data
 const profileData = {
@@ -84,6 +85,8 @@ const recentRevues = [
 ];
 
 export default function ProfileScreen() {
+  const { bookmarkedPosts } = useBookmarks();
+  
   const SettingsButton = () => (
     <TouchableOpacity 
       style={styles.settingsButton}
@@ -134,6 +137,34 @@ export default function ProfileScreen() {
             </View>
           </View>
         </View>
+
+        {/* Bookmarks Section */}
+        {bookmarkedPosts.length > 0 && (
+          <View style={styles.sectionContainer}>
+            <Text style={styles.sectionTitle}>BOOKMARKS</Text>
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.horizontalScrollContent}
+            >
+              {bookmarkedPosts.map(post => (
+                <TouchableOpacity 
+                  key={post.id} 
+                  style={styles.bookmarkCard}
+                  onPress={() => router.push(`/post/${post.id}`)}
+                >
+                  <Image source={{ uri: post.media.cover }} style={styles.mediaCover} />
+                  <Text style={styles.mediaAuthor}>{post.media.title}</Text>
+                  <View style={styles.bookmarkTextContainer}>
+                    <Text style={styles.bookmarkComment} numberOfLines={3}>
+                      {post.title || post.content}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
 
         {/* On Vue Section */}
         <View style={styles.sectionContainer}>
@@ -367,5 +398,18 @@ const styles = StyleSheet.create({
   },
   spacer: {
     height: 80,
+  },
+  bookmarkCard: {
+    width: 140,
+    marginRight: 12,
+  },
+  bookmarkTextContainer: {
+    marginTop: 8,
+    paddingHorizontal: 4,
+  },
+  bookmarkComment: {
+    fontSize: 12,
+    color: '#666',
+    lineHeight: 16,
   },
 });

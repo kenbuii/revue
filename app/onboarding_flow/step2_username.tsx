@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/contexts/AuthContext';
@@ -22,13 +22,14 @@ interface PasswordRequirements {
 }
 
 export default function Step2UsernameScreen() {
-  const { user, saveOnboardingData, getOnboardingData } = useAuth();
+  const { user, saveOnboardingData, getOnboardingData, signUp, loading, isAuthenticated } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [passwordStrength, setPasswordStrength] = useState<PasswordStrength | null>(null);
   const [isPasswordFocused, setIsPasswordFocused] = useState(false);
+  const [isCreatingAccount, setIsCreatingAccount] = useState(false);
   const [passwordRequirements, setPasswordRequirements] = useState<PasswordRequirements>({
     minLength: false,
     hasNumber: false,
@@ -129,14 +130,66 @@ export default function Step2UsernameScreen() {
   };
 
   const handleNext = async () => {
-    // Save onboarding data
-    await saveOnboardingData({
-      email,
-      password,
-      step: 2
-    });
+    // Validate all fields first
+    const emailValid = validateEmail(email).isValid;
+    const passwordValid = validatePassword(password).isValid;
+
+    if (!emailValid || !passwordValid) {
+      Alert.alert('Validation Error', 'Please fix the errors above before continuing.');
+      return;
+    }
+
+    setIsCreatingAccount(true);
     
-    router.push('/onboarding_flow/step3_displayname');
+    try {
+      console.log('🔄 Creating Supabase auth user...');
+      console.log('📧 Email being used:', email.trim());
+      
+      // Create Supabase auth user (without username for now)
+      const result = await signUp(email.trim(), password);
+      
+      console.log('📊 SignUp result:', result);
+      
+      if (result.success) {
+        console.log('✅ Auth user created successfully');
+        
+        // Check auth state immediately after signup
+        console.log('🔍 Auth state immediately after signup:');
+        console.log('- user:', user);
+        console.log('- Loading:', loading);
+        console.log('- isAuthenticated:', isAuthenticated);
+        
+        // Save onboarding data locally
+        await saveOnboardingData({
+          email: email.trim(),
+          step: 2
+        });
+        
+        // Wait a moment for auth state to update, then check if user is available
+        console.log('⏱️ Waiting for auth state to update...');
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Check auth state before proceeding
+        console.log('🔍 Checking auth state before navigation...');
+        console.log('- Current user:', user);
+        console.log('- Loading:', loading);
+        console.log('- isAuthenticated:', isAuthenticated);
+        
+        console.log('📍 Proceeding to step 3...');
+        router.push('/onboarding_flow/step3_displayname');
+      } else {
+        console.error('❌ Auth user creation failed:', result.error);
+        Alert.alert(
+          'Account Creation Failed', 
+          result.error || 'Failed to create account. Please try again.'
+        );
+      }
+    } catch (error) {
+      console.error('💥 Unexpected error during signup:', error);
+      Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+    } finally {
+      setIsCreatingAccount(false);
+    }
   };
 
   const handleBack = () => {
@@ -150,6 +203,12 @@ export default function Step2UsernameScreen() {
 
   // TODO: remove before deploying - test navigation button
   const handleTestNext = () => {
+    console.log('🧪 TEST: Simulating signed-up user for Step 3...');
+    // Save test data
+    saveOnboardingData({
+      email: 'test@example.com',
+      step: 2
+    });
     router.push('/onboarding_flow/step3_displayname');
   };
 
@@ -294,8 +353,17 @@ export default function Step2UsernameScreen() {
           
           {isFormValid && !isPasswordFocused && (
             <View style={styles.nextButtonContainer}>
-              <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
-                <Text style={styles.nextButtonText}>Next</Text>
+              <TouchableOpacity 
+                style={[
+                  styles.nextButton, 
+                  isCreatingAccount && styles.nextButtonDisabled
+                ]} 
+                onPress={handleNext}
+                disabled={isCreatingAccount}
+              >
+                <Text style={styles.nextButtonText}>
+                  {isCreatingAccount ? 'Creating Account...' : 'Next'}
+                </Text>
               </TouchableOpacity>
             </View>
           )}
@@ -479,5 +547,9 @@ const styles = StyleSheet.create({
   centeredInputGroup: {
     gap: 8,
     alignItems: 'stretch',
+  },
+  nextButtonDisabled: {
+    backgroundColor: '#CCCCCC',
+    borderColor: '#CCCCCC',
   },
 });

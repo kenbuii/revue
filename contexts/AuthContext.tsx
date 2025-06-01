@@ -13,6 +13,7 @@ interface AuthContextType extends AuthState {
   completeOnboarding: () => Promise<{ success: boolean; error?: string }>;
   saveOnboardingData: (data: any) => Promise<void>;
   getOnboardingData: () => Promise<any>;
+  syncOnboardingDataToSupabase: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -51,6 +52,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
             loading: false,
             isAuthenticated: !!session,
           });
+
+          // Sync onboarding data if user is already logged in
+          if (session?.user) {
+            console.log('🔄 User already authenticated - syncing onboarding data...');
+            await authService.syncOnboardingDataToSupabase();
+          }
         }
       } catch (error) {
         console.error('Error initializing auth:', error);
@@ -79,6 +86,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
             loading: false,
             isAuthenticated: !!session,
           });
+
+          // Sync onboarding data when user signs in
+          if (session?.user && event === 'SIGNED_IN') {
+            console.log('🔄 User signed in - syncing onboarding data...');
+            await authService.syncOnboardingDataToSupabase();
+          }
         }
       }
     );
@@ -98,6 +111,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
       
       if (result.error) {
         return { success: false, error: result.error.message };
+      }
+      
+      // Update auth state immediately with the result
+      if (result.user && result.session) {
+        console.log('🔄 Updating auth state immediately after signup...');
+        setAuthState({
+          session: result.session,
+          user: result.user,
+          loading: false,
+          isAuthenticated: true,
+        });
       }
       
       return { success: true };
@@ -184,6 +208,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return await authService.getOnboardingData();
   };
 
+  const syncOnboardingDataToSupabase = async () => {
+    return await authService.syncOnboardingDataToSupabase();
+  };
+
   const contextValue: AuthContextType = {
     ...authState,
     signUp,
@@ -195,6 +223,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     completeOnboarding,
     saveOnboardingData,
     getOnboardingData,
+    syncOnboardingDataToSupabase,
   };
 
   return (

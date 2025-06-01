@@ -8,28 +8,127 @@ import { supabase } from '@/lib/supabase';
 import KeyboardDismissWrapper from '@/components/KeyboardDismissWrapper';
 
 export default function Step3DisplayNameScreen() {
-  const { user, saveOnboardingData, getOnboardingData } = useAuth();
+  const { user, session, saveOnboardingData, getOnboardingData } = useAuth();
   const [displayName, setDisplayName] = useState('');
+  const [username, setUsername] = useState('');
+  const [useAutoUsername, setUseAutoUsername] = useState(true);
   const [isDisplayNameFocused, setIsDisplayNameFocused] = useState(false);
+  const [isUsernameFocused, setIsUsernameFocused] = useState(false);
+  const [usernameError, setUsernameError] = useState('');
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [showImageConfirmation, setShowImageConfirmation] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
+
+  // Debug auth state
+  useEffect(() => {
+    console.log('🔍 Step 3 - Auth state debug:');
+    console.log('- user:', user);
+    console.log('- session:', session);
+    console.log('- session.user:', session?.user);
+    
+    // If we still don't have auth after a few seconds, there might be an issue
+    if (!user && !session?.user) {
+      console.log('⚠️ No auth state available in Step 3 - checking again in 2 seconds...');
+      const timeoutId = setTimeout(() => {
+        console.log('🔍 Step 3 - Auth state recheck:');
+        console.log('- user:', user);
+        console.log('- session:', session);
+        console.log('- session.user:', session?.user);
+      }, 2000);
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [user, session]);
 
   // Load existing data
   useEffect(() => {
     const loadData = async () => {
       const data = await getOnboardingData();
       if (data.displayName) setDisplayName(data.displayName);
+      if (data.username) {
+        setUsername(data.username);
+        setUseAutoUsername(false); // If they have a saved username, they probably customized it
+      }
       if (data.profileImageUrl) setProfileImageUrl(data.profileImageUrl);
     };
     loadData();
   }, [getOnboardingData]);
 
+  // Auto-generate username from display name
+  const generateUsername = (name: string): string => {
+    if (!name.trim()) return '';
+    
+    return name
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, '') // Remove special characters
+      .replace(/\s+/g, '_') // Replace spaces with underscores
+      .substring(0, 20) // Limit length
+      + '_'; // Add underscore suffix
+  };
+
+  // Username validation
+  const validateUsername = (value: string): { isValid: boolean; error?: string } => {
+    if (value.length === 0) {
+      return { isValid: false };
+    }
+    if (value.length < 3) {
+      return { isValid: false, error: 'Username must be at least 3 characters' };
+    }
+    if (!/^[a-zA-Z0-9_]+$/.test(value)) {
+      return { isValid: false, error: 'Username can only contain letters, numbers, and underscores' };
+    }
+    return { isValid: true };
+  };
+
+  // Handle display name change
+  const handleDisplayNameChange = (value: string) => {
+    setDisplayName(value);
+    
+    // Auto-generate username if auto mode is enabled
+    if (useAutoUsername) {
+      const autoUsername = generateUsername(value);
+      setUsername(autoUsername);
+    }
+  };
+
+  // Handle username change
+  const handleUsernameChange = (value: string) => {
+    setUsername(value);
+    const validation = validateUsername(value);
+    setUsernameError(validation.error || '');
+  };
+
+  // Toggle auto username
+  const handleToggleAutoUsername = () => {
+    const newAutoMode = !useAutoUsername;
+    setUseAutoUsername(newAutoMode);
+    
+    if (newAutoMode) {
+      // Generate username from current display name
+      const autoUsername = generateUsername(displayName);
+      setUsername(autoUsername);
+      setUsernameError('');
+    }
+  };
+
   const handleNext = async () => {
+    // Validate required fields
+    if (!displayName.trim()) {
+      Alert.alert('Validation Error', 'Please enter a display name.');
+      return;
+    }
+
+    const usernameValidation = validateUsername(username);
+    if (!usernameValidation.isValid) {
+      Alert.alert('Validation Error', usernameValidation.error || 'Please fix the username.');
+      return;
+    }
+
     // Save onboarding data
     await saveOnboardingData({
       displayName,
+      username,
       profileImageUrl,
       step: 3
     });
@@ -49,6 +148,16 @@ export default function Step3DisplayNameScreen() {
   // Handle display name blur
   const handleDisplayNameBlur = () => {
     setIsDisplayNameFocused(false);
+  };
+
+  // Handle username focus
+  const handleUsernameFocus = () => {
+    setIsUsernameFocused(true);
+  };
+
+  // Handle username blur
+  const handleUsernameBlur = () => {
+    setIsUsernameFocused(false);
   };
 
   // Handle avatar/image picker
@@ -77,21 +186,43 @@ export default function Step3DisplayNameScreen() {
 
   // Confirm selected image
   const handleConfirmImage = async () => {
-    if (!selectedImage || !user) return;
+    const currentUser = user || session?.user;
+    
+    // Temporary fallback for testing - use a mock user ID
+    const fallbackUserId = 'temp-user-' + Date.now();
+    const userId = currentUser?.id || fallbackUserId;
+    
+    if (!selectedImage) {
+      console.log('❌ Missing selectedImage');
+      return;
+    }
+
+    console.log('🔄 Profile upload attempt:');
+    console.log('- selectedImage:', !!selectedImage);
+    console.log('- user:', !!user);
+    console.log('- sessionUser:', !!session?.user);
+    console.log('- currentUser:', !!currentUser);
+    console.log('- userId being used:', userId);
+    console.log('- isFallback:', !currentUser);
 
     setIsUploading(true);
     setShowImageConfirmation(false);
 
     try {
+      console.log('🔄 Starting profile image upload...');
+      console.log('👤 User ID:', userId);
+      
       // Generate unique filename
       const timestamp = Date.now();
-      const fileName = `${user.id}/profile-${timestamp}.jpg`;
+      const fileName = `${userId}/profile-${timestamp}.jpg`;
+      console.log('📁 File name:', fileName);
 
       // Convert image to blob
       const response = await fetch(selectedImage);
       const blob = await response.blob();
+      console.log('📦 Blob created, size:', blob.size);
 
-      // Upload to Supabase Storage
+      // Upload to Supabase Storage using auth client
       const { data, error } = await supabase.storage
         .from('profile-images')
         .upload(fileName, blob, {
@@ -100,8 +231,11 @@ export default function Step3DisplayNameScreen() {
         });
 
       if (error) {
+        console.error('❌ Supabase upload error:', error);
         throw error;
       }
+
+      console.log('✅ Upload successful:', data);
 
       // Get public URL
       const { data: urlData } = supabase.storage
@@ -109,16 +243,23 @@ export default function Step3DisplayNameScreen() {
         .getPublicUrl(fileName);
 
       const publicUrl = urlData.publicUrl;
+      console.log('🔗 Public URL generated:', publicUrl);
+      console.log('📋 URL breakdown:');
+      console.log('- Full URL:', publicUrl);
+      console.log('- URL length:', publicUrl.length);
+      console.log('- URL type:', typeof publicUrl);
       
-      // Update profile table (if exists) or save to onboarding data
+      // Update the profile image URL state to display the new image
       setProfileImageUrl(publicUrl);
+      console.log('🎨 Profile image URL updated in state');
+      console.log('🔍 Current profileImageUrl state:', publicUrl);
       
-      console.log('✅ Profile image uploaded successfully:', publicUrl);
       Alert.alert('Success', 'Profile picture updated!');
 
     } catch (error) {
-      console.error('❌ Error uploading image:', error);
-      Alert.alert('Upload Error', 'Failed to upload profile picture. Please try again.');
+      console.error('❌ Error uploading profile image:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Please try again.';
+      Alert.alert('Upload Error', `Failed to upload profile picture: ${errorMessage}`);
     } finally {
       setIsUploading(false);
       setSelectedImage(null);
@@ -143,7 +284,7 @@ export default function Step3DisplayNameScreen() {
     router.push('/onboarding_flow/step4_contactsync');
   };
 
-  const isFormValid = displayName.trim().length > 0;
+  const isFormValid = displayName.trim().length > 0 && username.trim().length > 0 && validateUsername(username).isValid;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -159,28 +300,38 @@ export default function Step3DisplayNameScreen() {
       <KeyboardDismissWrapper>
         <View style={styles.contentContainer}>
           <View style={styles.content}>
-            {/* Header - hide when display name is focused */}
-            <View style={[styles.header, isDisplayNameFocused && styles.hidden]}>
-              <Text style={styles.welcomeText}>Welcome to</Text>
+            {/* Header - hide when display name or username is focused */}
+            <View style={[styles.header, (isDisplayNameFocused || isUsernameFocused) && styles.hidden]}>
               <Text style={styles.title}>revue</Text>
               {user && (
                 <Text style={styles.userInfo}>Step 3 of 6</Text>
               )}
             </View>
             
-            {/* Avatar - hide when display name is focused */}
-            <View style={[styles.avatarContainer, isDisplayNameFocused && styles.hidden]}>
+            {/* Avatar - hide when display name or username is focused */}
+            <View style={[styles.avatarContainer, (isDisplayNameFocused || isUsernameFocused) && styles.hidden]}>
               <TouchableOpacity style={styles.avatar} onPress={handleAvatarPress} disabled={isUploading}>
                 {isUploading ? (
                   <ActivityIndicator size="large" color="#142D0A" />
                 ) : profileImageUrl ? (
-                  <Image source={{ uri: profileImageUrl }} style={styles.avatarImage} />
+                  <>
+                    <Image 
+                      source={{ uri: profileImageUrl }} 
+                      style={styles.avatarImage}
+                      onLoad={() => console.log('✅ Image loaded successfully:', profileImageUrl)}
+                      onError={(error) => console.log('❌ Image load error:', error.nativeEvent.error, 'URL:', profileImageUrl)}
+                    />
+                  </>
                 ) : (
                   <View style={styles.avatarPlaceholder}>
                   </View>
                 )}
               </TouchableOpacity>
               <Text style={styles.avatarHint}>Tap to add photo</Text>
+              {/* Debug info */}
+              {profileImageUrl && (
+                <Text style={styles.debugText}>URL: {profileImageUrl}</Text>
+              )}
             </View>
             
             {/* Display name field - always rendered, centered when focused */}
@@ -189,16 +340,55 @@ export default function Step3DisplayNameScreen() {
               <TextInput
                 style={styles.input}
                 value={displayName}
-                onChangeText={setDisplayName}
+                onChangeText={handleDisplayNameChange}
                 onFocus={handleDisplayNameFocus}
                 onBlur={handleDisplayNameBlur}
-                placeholder="Enter display name"
+                placeholder="Katniss Everdeen"
                 placeholderTextColor="#8B9A7D"
               />
+              {isDisplayNameFocused && (
+                <Text style={styles.hintText}>This is what others will see</Text>
+              )}
+            </View>
+            
+            {/* Auto-generation toggle - positioned between the two fields */}
+            <View style={[styles.toggleContainer, (isDisplayNameFocused || isUsernameFocused) && styles.hidden]}>
+              <TouchableOpacity style={styles.toggleButton} onPress={handleToggleAutoUsername}>
+                <Text style={styles.toggleButtonText}>
+                  {useAutoUsername ? '🎲 Auto-generate username' : '✏️ Use custom username'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            
+            {/* Username field - always rendered, centered when focused */}
+            <View style={[styles.inputGroup, isUsernameFocused && styles.centeredInputGroup]}>
+              <Text style={styles.label}>Username:</Text>
+              <TextInput
+                style={[
+                  styles.input,
+                  useAutoUsername && styles.inputDisabled,
+                  usernameError ? styles.inputError : username && validateUsername(username).isValid ? styles.inputValid : null
+                ]}
+                value={username}
+                onChangeText={handleUsernameChange}
+                onFocus={handleUsernameFocus}
+                onBlur={handleUsernameBlur}
+                placeholder="katniss_"
+                placeholderTextColor="#8B9A7D"
+                editable={!useAutoUsername}
+              />
+              {isUsernameFocused && !useAutoUsername && (
+                <Text style={styles.hintText}>Letters, numbers, and underscores only</Text>
+              )}
+              {usernameError ? (
+                <Text style={styles.errorText}>{usernameError}</Text>
+              ) : username && validateUsername(username).isValid ? (
+                <Text style={styles.successText}>✓ Username looks good</Text>
+              ) : null}
             </View>
           </View>
           
-          {isFormValid && !isDisplayNameFocused && (
+          {isFormValid && !isDisplayNameFocused && !isUsernameFocused && (
             <View style={styles.nextButtonContainer}>
               <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
                 <Text style={styles.nextButtonText}>Next</Text>
@@ -277,24 +467,18 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 40,
-    paddingTop: 80,
+    paddingTop: 40,
   },
   header: {
     alignItems: 'center',
-    marginBottom: 60,
-  },
-  welcomeText: {
-    fontSize: 18,
-    color: '#142D0A',
-    marginBottom: 5,
-    fontFamily: 'LibreBaskerville_400Regular',
+    marginBottom: 30,
   },
   title: {
-    fontSize: 48,
+    fontSize: 29,
     color: '#142D0A',
     fontWeight: '300',
     fontFamily: 'LibreBaskerville_400Regular_Italic',
-    marginBottom: 10,
+    marginBottom: 5,
   },
   userInfo: {
     fontSize: 12,
@@ -303,7 +487,7 @@ const styles = StyleSheet.create({
   },
   avatarContainer: {
     alignItems: 'center',
-    marginBottom: 60,
+    marginBottom: 30,
   },
   avatar: {
     width: 120,
@@ -323,7 +507,7 @@ const styles = StyleSheet.create({
   },
   inputGroup: {
     gap: 8,
-    marginBottom: 60,
+    marginBottom: 42,
   },
   label: {
     fontSize: 16,
@@ -440,5 +624,53 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     textAlign: 'center',
     fontFamily: 'LibreBaskerville_700Bold',
+  },
+  hintText: {
+    fontSize: 12,
+    color: '#666',
+    fontFamily: 'LibreBaskerville_400Regular_Italic',
+  },
+  inputDisabled: {
+    backgroundColor: '#F5F5F0',
+  },
+  inputError: {
+    borderColor: '#FF6B6B',
+  },
+  inputValid: {
+    borderColor: '#142D0A',
+  },
+  errorText: {
+    color: '#FF6B6B',
+    fontSize: 12,
+    fontFamily: 'LibreBaskerville_400Regular_Italic',
+  },
+  successText: {
+    color: '#142D0A',
+    fontSize: 12,
+    fontFamily: 'LibreBaskerville_400Regular_Italic',
+  },
+  toggleContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 42,
+  },
+  toggleButton: {
+    backgroundColor: '#142D0A',
+    borderRadius: 20,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+  },
+  toggleButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '500',
+    textAlign: 'center',
+    fontFamily: 'LibreBaskerville_700Bold',
+  },
+  debugText: {
+    fontSize: 12,
+    color: '#666',
+    fontFamily: 'LibreBaskerville_400Regular_Italic',
   },
 });
