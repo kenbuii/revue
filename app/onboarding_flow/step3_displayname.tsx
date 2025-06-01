@@ -177,7 +177,6 @@ export default function Step3DisplayNameScreen() {
                   <Image source={{ uri: profileImageUrl }} style={styles.avatarImage} />
                 ) : (
                   <View style={styles.avatarPlaceholder}>
-                    <Text style={styles.avatarPlusText}>+</Text>
                   </View>
                 )}
               </TouchableOpacity>
@@ -377,11 +376,6 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     borderRadius: 60,
-  },
-  avatarPlusText: {
-    fontSize: 24,
-    color: '#142D0A',
-    fontWeight: 'bold',
   },
   avatarHint: {
     fontSize: 12,

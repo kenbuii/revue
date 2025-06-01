@@ -93,8 +93,7 @@ export default function Step1LoginScreen() {
         
         <View style={styles.infoContainer}>
           <Text style={styles.infoText}>
-            🔧 New users: Use "Create Test Account" to get started with onboarding{'\n'}
-            🔧 Returning users: Use "Log In" to access your account
+            revue (noun) a multi-act theatrical entertainment
           </Text>
         </View>
       </View>
