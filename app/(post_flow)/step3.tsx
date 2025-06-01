@@ -1,3 +1,4 @@
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -8,7 +9,8 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { useState } from "react";
+import { SafeAreaView } from 'react-native-safe-area-context';
+import KeyboardDismissWrapper from '@/components/KeyboardDismissWrapper';
 
 export default function Step3() {
   const params = useLocalSearchParams();
@@ -59,123 +61,125 @@ export default function Step3() {
   };
 
   return (
-    <View style={styles.container}>
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
+    <SafeAreaView style={styles.container}>
+      <KeyboardDismissWrapper>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
         >
-          <Ionicons name="chevron-back" size={24} color="#000" />
-          <Text style={styles.backText}>Back</Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+          >
+            <Ionicons name="chevron-back" size={24} color="#000" />
+            <Text style={styles.backText}>Back</Text>
+          </TouchableOpacity>
 
-        <Text style={styles.headerTitle}>write a new revue</Text>
-        <Text style={styles.stepTitle}>STEP 3</Text>
+          <Text style={styles.headerTitle}>write a new revue</Text>
+          <Text style={styles.stepTitle}>STEP 3</Text>
 
-        <View style={styles.mediaInfo}>
-          <View style={styles.profileSection}>
-            <View style={styles.avatar}>
-              <Ionicons name="person-circle" size={40} color="#2F4F4F" />
-            </View>
-            <Text style={styles.username}>kristine</Text>
-            <Text style={styles.revuingText}>is revuing</Text>
-          </View>
-
-          <View style={styles.titleSection}>
-            <Text style={styles.mediaTitle}>{params.title}</Text>
-            <Text style={styles.mediaCreator}>
-              BY {params.creator?.toString().toUpperCase()}
-            </Text>
-
-            <View style={styles.mediaDetails}>
-              <Text style={styles.mediaType}>{params.type}</Text>
-              <Text style={styles.separator}>@</Text>
-              {isEditingPage ? (
-                <TextInput
-                  style={styles.pageNumberInput}
-                  placeholder={getLocationPlaceholder()}
-                  value={pageNumber}
-                  onChangeText={setPageNumber}
-                  onBlur={() => setIsEditingPage(false)}
-                  autoFocus
-                  placeholderTextColor="#666"
-                />
-              ) : (
-                <TouchableOpacity
-                  style={styles.pageNumberButton}
-                  onPress={() => setIsEditingPage(true)}
-                >
-                  <Text style={styles.pageNumberText}>{formatLocation()}</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          </View>
-
-          <View style={styles.mediaCover}>
-            <Ionicons name="image-outline" size={48} color="#2F4F4F" />
-          </View>
-        </View>
-
-        <View style={styles.postTitleContainer}>
-          {isEditingTitle ? (
-            <TextInput
-              style={styles.postTitleInput}
-              placeholder="Enter post title (optional)"
-              value={postTitle}
-              onChangeText={setPostTitle}
-              onBlur={() => setIsEditingTitle(false)}
-              autoFocus
-              placeholderTextColor="#666"
-            />
-          ) : (
-            <TouchableOpacity
-              style={styles.postTitleButton}
-              onPress={() => setIsEditingTitle(true)}
-            >
-              <Text
-                style={[
-                  styles.postTitleText,
-                  postTitle ? styles.filledPostTitle : null,
-                ]}
-              >
-                {postTitle || "Optional Post Title"}
-              </Text>
-              <Ionicons name="pencil" size={20} color="#2F4F4F" />
-            </TouchableOpacity>
-          )}
-        </View>
-
-        <Text style={styles.label}>thoughts:</Text>
-        <TextInput
-          style={styles.thoughtsInput}
-          placeholder="Type something"
-          value={thoughts}
-          onChangeText={setThoughts}
-          multiline
-          placeholderTextColor="#666"
-        />
-
-        <Text style={styles.label}>optional picture:</Text>
-        <View style={styles.libraryButton}>
-          <Text style={styles.libraryTitle}>Library</Text>
-          <View style={styles.imageGrid}>
-            {[1, 2, 3, 4, 5, 6].map((index) => (
-              <View key={index} style={styles.gridImage}>
-                <Ionicons name="image-outline" size={32} color="#2F4F4F" />
+          <View style={styles.mediaInfo}>
+            <View style={styles.profileSection}>
+              <View style={styles.avatar}>
+                <Ionicons name="person-circle" size={40} color="#2F4F4F" />
               </View>
-            ))}
-          </View>
-        </View>
+              <Text style={styles.username}>kristine</Text>
+              <Text style={styles.revuingText}>is revuing</Text>
+            </View>
 
-        <TouchableOpacity style={styles.postButton} onPress={handlePost}>
-          <Text style={styles.postButtonText}>Post</Text>
-        </TouchableOpacity>
-      </ScrollView>
-    </View>
+            <View style={styles.titleSection}>
+              <Text style={styles.mediaTitle}>{params.title}</Text>
+              <Text style={styles.mediaCreator}>
+                BY {params.creator?.toString().toUpperCase()}
+              </Text>
+
+              <View style={styles.mediaDetails}>
+                <Text style={styles.mediaType}>{params.type}</Text>
+                <Text style={styles.separator}>@</Text>
+                {isEditingPage ? (
+                  <TextInput
+                    style={styles.pageNumberInput}
+                    placeholder={getLocationPlaceholder()}
+                    value={pageNumber}
+                    onChangeText={setPageNumber}
+                    onBlur={() => setIsEditingPage(false)}
+                    autoFocus
+                    placeholderTextColor="#666"
+                  />
+                ) : (
+                  <TouchableOpacity
+                    style={styles.pageNumberButton}
+                    onPress={() => setIsEditingPage(true)}
+                  >
+                    <Text style={styles.pageNumberText}>{formatLocation()}</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+
+            <View style={styles.mediaCover}>
+              <Ionicons name="image-outline" size={48} color="#2F4F4F" />
+            </View>
+          </View>
+
+          <View style={styles.postTitleContainer}>
+            {isEditingTitle ? (
+              <TextInput
+                style={styles.postTitleInput}
+                placeholder="Enter post title (optional)"
+                value={postTitle}
+                onChangeText={setPostTitle}
+                onBlur={() => setIsEditingTitle(false)}
+                autoFocus
+                placeholderTextColor="#666"
+              />
+            ) : (
+              <TouchableOpacity
+                style={styles.postTitleButton}
+                onPress={() => setIsEditingTitle(true)}
+              >
+                <Text
+                  style={[
+                    styles.postTitleText,
+                    postTitle ? styles.filledPostTitle : null,
+                  ]}
+                >
+                  {postTitle || "Optional Post Title"}
+                </Text>
+                <Ionicons name="pencil" size={20} color="#2F4F4F" />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <Text style={styles.label}>thoughts:</Text>
+          <TextInput
+            style={styles.thoughtsInput}
+            placeholder="Type something"
+            value={thoughts}
+            onChangeText={setThoughts}
+            multiline
+            placeholderTextColor="#666"
+          />
+
+          <Text style={styles.label}>optional picture:</Text>
+          <View style={styles.libraryButton}>
+            <Text style={styles.libraryTitle}>Library</Text>
+            <View style={styles.imageGrid}>
+              {[1, 2, 3, 4, 5, 6].map((index) => (
+                <View key={index} style={styles.gridImage}>
+                  <Ionicons name="image-outline" size={32} color="#2F4F4F" />
+                </View>
+              ))}
+            </View>
+          </View>
+
+          <TouchableOpacity style={styles.postButton} onPress={handlePost}>
+            <Text style={styles.postButtonText}>Post</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </KeyboardDismissWrapper>
+    </SafeAreaView>
   );
 }
 

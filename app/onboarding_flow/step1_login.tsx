@@ -7,7 +7,6 @@ import { useAuth } from '@/contexts/AuthContext';
 export default function Step1LoginScreen() {
   const { signIn, signUp, testConnection, loading, hasCompletedOnboarding } = useAuth();
   const [connectionTested, setConnectionTested] = useState(false);
-  const [isSigningIn, setIsSigningIn] = useState(false);
 
   // Test connection when component mounts
   useEffect(() => {
@@ -33,64 +32,14 @@ export default function Step1LoginScreen() {
     Alert.alert('Coming Soon', 'Google login will be implemented in Phase 4');
   };
 
-  const handleLoginWithUsername = async () => {
-    // For testing, use demo accounts
-    setIsSigningIn(true);
-    
-    try {
-      console.log('🔄 Attempting login with demo@example.com...');
-      
-      // Demo account for testing - this will fail if account doesn't exist
-      const result = await signIn('demo@example.com', 'myfirst123');
-      
-      if (result.success) {
-        console.log('✅ Demo login successful');
-        
-        // Check if user has completed onboarding
-        const onboardingCompleted = await hasCompletedOnboarding();
-        
-        if (onboardingCompleted) {
-          // User has completed onboarding, go to main app
-          console.log('📍 Routing to main app (onboarding completed)');
-          router.replace('/(tabs)');
-        } else {
-          // User needs to complete onboarding
-          console.log('📍 Routing to onboarding step 2 (onboarding incomplete)');
-          router.replace('/onboarding_flow/step2_username');
-        }
-      } else {
-        console.error('❌ Login failed:', result.error);
-        Alert.alert(
-          'Login Failed', 
-          `${result.error}\n\n🔧 Debug tip: Try the "Create Test Account" button first - this creates a proper authenticated user.`
-        );
-      }
-    } catch (error) {
-      console.error('Login error:', error);
-      Alert.alert('Login Error', 'An unexpected error occurred');
-    } finally {
-      setIsSigningIn(false);
-    }
+  const handleLoginWithUsername = () => {
+    // Navigate to login form for existing users
+    router.push('/onboarding_flow/login_form');
   };
 
-  const handleSignUp = async () => {
-    // For testing navigation flow only - no actual account creation
-    setIsSigningIn(true);
-    
-    try {
-      console.log('🔄 Navigating to step 2 (no account creation)...');
-      
-      // Simulate a brief loading state then navigate
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      console.log('✅ Navigating to onboarding step 2');
-      router.replace('/onboarding_flow/step2_username');
-    } catch (error) {
-      console.error('Navigation error:', error);
-      Alert.alert('Navigation Error', 'An unexpected error occurred');
-    } finally {
-      setIsSigningIn(false);
-    }
+  const handleSignUp = () => {
+    // Navigate to onboarding flow for new users
+    router.push('/onboarding_flow/step2_username');
   };
 
   // TODO: remove before deploying - test navigation button
@@ -118,33 +67,34 @@ export default function Step1LoginScreen() {
         
         <View style={styles.buttonContainer}>
           <TouchableOpacity 
-            style={[styles.signupButton, loading && styles.disabledButton]} 
+            style={styles.signupButton} 
             onPress={handleSignUp}
-            disabled={loading || isSigningIn}
           >
-            {isSigningIn ? (
-              <ActivityIndicator size="small" color="white" />
-            ) : (
-              <Text style={styles.signupButtonText}>Create Account</Text>
-            )}
+            <Text style={styles.signupButtonText}>create account</Text>
           </TouchableOpacity>
+          
+          {/* <TouchableOpacity 
+            style={[styles.googleButton, loading && styles.disabledButton]} 
+            onPress={handleContinueWithGoogle}
+            disabled={loading}
+          >
+            <Text style={styles.googleButtonText}>Continue with</Text>
+            <Text style={styles.googleText}>Google</Text>
+          </TouchableOpacity> */}
           
           <TouchableOpacity 
             style={[styles.usernameButton, loading && styles.disabledButton]} 
             onPress={handleLoginWithUsername}
-            disabled={loading || isSigningIn}
+            disabled={loading}
           >
-            {isSigningIn ? (
-              <ActivityIndicator size="small" color="#142D0A" />
-            ) : (
-              <Text style={styles.usernameButtonText}>Login [TEST]</Text>
-            )}
+            <Text style={styles.usernameButtonText}>log in</Text>
           </TouchableOpacity>
         </View>
         
         <View style={styles.infoContainer}>
           <Text style={styles.infoText}>
-            🔧 For testing: Use "Create Test Account" (recommended) or try demo@example.com if manually created
+            🔧 New users: Use "Create Test Account" to get started with onboarding{'\n'}
+            🔧 Returning users: Use "Log In" to access your account
           </Text>
         </View>
       </View>

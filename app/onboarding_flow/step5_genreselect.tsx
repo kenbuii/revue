@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Image } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import KeyboardDismissWrapper from '@/components/KeyboardDismissWrapper';
 
 export default function Step5GenreSelectScreen() {
   const [searchText, setSearchText] = useState('');
@@ -45,60 +46,62 @@ export default function Step5GenreSelectScreen() {
         <Text style={styles.testButtonText}>TEST →</Text>
       </TouchableOpacity>
       
-      <View style={styles.contentContainer}>
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          <View style={styles.header}>
-            <Text style={styles.pickText}>pick your</Text>
-            <Text style={styles.favoriteText}>favorite vues</Text>
-            <Text style={styles.subtitle}>Add up to 10!</Text>
-          </View>
-          
-          <View style={styles.searchContainer}>
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search"
-              value={searchText}
-              onChangeText={setSearchText}
-              placeholderTextColor="#8B9A7D"
-            />
-            <Text style={styles.searchIcon}>🔍</Text>
-          </View>
-          
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Popular</Text>
-            <View style={styles.grid}>
-              {popularItems.map((item) => (
-                <TouchableOpacity
-                  key={item.id}
-                  style={[
-                    styles.gridItem,
-                    { backgroundColor: item.color },
-                    selectedItems.includes(item.id) && styles.selectedItem
-                  ]}
-                  onPress={() => handleItemSelect(item.id)}
-                >
-                  <View style={styles.itemContent}>
-                    <Text style={styles.itemTitle}>{item.title}</Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
+      <KeyboardDismissWrapper>
+        <View style={styles.contentContainer}>
+          <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+            <View style={styles.header}>
+              <Text style={styles.pickText}>pick your</Text>
+              <Text style={styles.favoriteText}>favorite vues</Text>
+              <Text style={styles.subtitle}>Add up to 10!</Text>
             </View>
-          </View>
+            
+            <View style={styles.searchContainer}>
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search"
+                value={searchText}
+                onChangeText={setSearchText}
+                placeholderTextColor="#8B9A7D"
+              />
+              <Text style={styles.searchIcon}>🔍</Text>
+            </View>
+            
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Popular</Text>
+              <View style={styles.grid}>
+                {popularItems.map((item) => (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={[
+                      styles.gridItem,
+                      { backgroundColor: item.color },
+                      selectedItems.includes(item.id) && styles.selectedItem
+                    ]}
+                    onPress={() => handleItemSelect(item.id)}
+                  >
+                    <View style={styles.itemContent}>
+                      <Text style={styles.itemTitle}>{item.title}</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+            
+            <Text style={styles.bottomText}>
+              This will be displayed on your profile page,{'\n'}
+              but you can always change them later!
+            </Text>
+          </ScrollView>
           
-          <Text style={styles.bottomText}>
-            This will be displayed on your profile page,{'\n'}
-            but you can always change them later!
-          </Text>
-        </ScrollView>
-        
-        {selectedItems.length > 0 && (
-          <View style={styles.nextButtonContainer}>
-            <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
-              <Text style={styles.nextButtonText}>Next</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-      </View>
+          {selectedItems.length > 0 && (
+            <View style={styles.nextButtonContainer}>
+              <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
+                <Text style={styles.nextButtonText}>Next</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      </KeyboardDismissWrapper>
     </SafeAreaView>
   );
 }

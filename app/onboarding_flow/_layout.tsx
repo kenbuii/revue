@@ -6,6 +6,7 @@ export default function OnboardingLayout() {
     <>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="step1_login" />
+        <Stack.Screen name="login_form" />
         <Stack.Screen name="step2_username" />
         <Stack.Screen name="step3_displayname" />
         <Stack.Screen name="step4_contactsync" />

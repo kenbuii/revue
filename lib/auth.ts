@@ -234,12 +234,53 @@ class AuthService {
    */
   async hasCompletedOnboarding(): Promise<boolean> {
     try {
-      // For now, check AsyncStorage for onboarding completion
-      // Later this will check the database
+      // First check the explicit completion flag
       const completed = await AsyncStorage.getItem('onboarding_completed');
-      return completed === 'true';
+      if (completed === 'true') {
+        console.log('✅ User marked as onboarding completed in storage');
+        return true;
+      }
+
+      // If not explicitly marked, check if user has substantial onboarding data
+      // This helps with existing users who logged in but never hit the final step
+      const onboardingData = await this.getOnboardingData();
+      const hasSubstantialData = !!(
+        onboardingData.email || 
+        onboardingData.displayName || 
+        onboardingData.selectedGenres?.length > 0 ||
+        onboardingData.step >= 4  // Made it to genre selection or beyond
+      );
+
+      if (hasSubstantialData) {
+        console.log('🔍 User has substantial onboarding data, considering completed:', onboardingData);
+        // Auto-mark as completed for future checks
+        await this.completeOnboarding();
+        return true;
+      }
+
+      console.log('❌ User has not completed onboarding');
+      return false;
     } catch (err) {
       console.error('Error checking onboarding status:', err);
+      return false;
+    }
+  }
+
+  /**
+   * Check if user should be considered a "returning user" based on their data
+   */
+  async isReturningUser(): Promise<boolean> {
+    try {
+      const onboardingData = await this.getOnboardingData();
+      // Consider them returning if they have any meaningful data saved
+      return !!(
+        onboardingData.email || 
+        onboardingData.username || 
+        onboardingData.displayName ||
+        onboardingData.step > 1
+      );
+    } catch (err) {
+      console.error('Error checking returning user status:', err);
       return false;
     }
   }

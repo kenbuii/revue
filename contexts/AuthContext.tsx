@@ -9,6 +9,7 @@ interface AuthContextType extends AuthState {
   signOut: () => Promise<{ success: boolean; error?: string }>;
   testConnection: () => Promise<{ success: boolean; error?: string }>;
   hasCompletedOnboarding: () => Promise<boolean>;
+  isReturningUser: () => Promise<boolean>;
   completeOnboarding: () => Promise<{ success: boolean; error?: string }>;
   saveOnboardingData: (data: any) => Promise<void>;
   getOnboardingData: () => Promise<any>;
@@ -167,6 +168,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return await authService.hasCompletedOnboarding();
   };
 
+  const isReturningUser = async () => {
+    return await authService.isReturningUser();
+  };
+
   const completeOnboarding = async () => {
     return await authService.completeOnboarding();
   };
@@ -186,6 +191,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     signOut,
     testConnection,
     hasCompletedOnboarding,
+    isReturningUser,
     completeOnboarding,
     saveOnboardingData,
     getOnboardingData,

@@ -1,3 +1,4 @@
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -10,7 +11,8 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { useState } from "react";
+import { SafeAreaView } from 'react-native-safe-area-context';
+import KeyboardDismissWrapper from '@/components/KeyboardDismissWrapper';
 
 type MediaFields = {
   [key: string]: {
@@ -154,66 +156,68 @@ export default function Step2() {
   const fields = mediaFields[type as keyof MediaFields];
 
   return (
-    <View style={styles.container}>
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
+    <SafeAreaView style={styles.container}>
+      <KeyboardDismissWrapper>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
         >
-          <Ionicons name="chevron-back" size={24} color="#000" />
-          <Text style={styles.backText}>Back</Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+          >
+            <Ionicons name="chevron-back" size={24} color="#000" />
+            <Text style={styles.backText}>Back</Text>
+          </TouchableOpacity>
 
-        <Text style={styles.headerTitle}>write a new revue</Text>
-        <Text style={styles.stepTitle}>STEP 2</Text>
+          <Text style={styles.headerTitle}>write a new revue</Text>
+          <Text style={styles.stepTitle}>STEP 2</Text>
 
-        <Text style={styles.label}>title of {type}:</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Type something"
-          value={title}
-          onChangeText={setTitle}
-          placeholderTextColor="#666"
-        />
+          <Text style={styles.label}>title of {type}:</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Type something"
+            value={title}
+            onChangeText={setTitle}
+            placeholderTextColor="#666"
+          />
 
-        <Text style={styles.label}>{fields.creatorLabel}</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Type something"
-          value={creator}
-          onChangeText={setCreator}
-          placeholderTextColor="#666"
-        />
+          <Text style={styles.label}>{fields.creatorLabel}</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Type something"
+            value={creator}
+            onChangeText={setCreator}
+            placeholderTextColor="#666"
+          />
 
-        <Text style={styles.label}>optional:</Text>
-        <View style={styles.placeholderImage}>
-          <Ionicons name="image-outline" size={32} color="#2F4F4F" />
-          <Text style={styles.placeholderText}>{fields.uploadLabel}</Text>
-        </View>
+          <Text style={styles.label}>optional:</Text>
+          <View style={styles.placeholderImage}>
+            <Ionicons name="image-outline" size={32} color="#2F4F4F" />
+            <Text style={styles.placeholderText}>{fields.uploadLabel}</Text>
+          </View>
 
-        <Dropdown
-          label="year created:"
-          value={year}
-          options={years}
-          onSelect={setYear}
-        />
+          <Dropdown
+            label="year created:"
+            value={year}
+            options={years}
+            onSelect={setYear}
+          />
 
-        <Dropdown
-          label="genre:"
-          value={genre}
-          options={fields.genreOptions}
-          onSelect={setGenre}
-        />
+          <Dropdown
+            label="genre:"
+            value={genre}
+            options={fields.genreOptions}
+            onSelect={setGenre}
+          />
 
-        <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
-          <Text style={styles.nextButtonText}>Next</Text>
-        </TouchableOpacity>
-      </ScrollView>
-    </View>
+          <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
+            <Text style={styles.nextButtonText}>Next</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </KeyboardDismissWrapper>
+    </SafeAreaView>
   );
 }
 
