@@ -293,9 +293,9 @@ export default function Step3DisplayNameScreen() {
       </TouchableOpacity>
       
       {/* TODO: remove before deploying - test navigation button */}
-      <TouchableOpacity style={styles.testButton} onPress={handleTestNext}>
+      {/* <TouchableOpacity style={styles.testButton} onPress={handleTestNext}>
         <Text style={styles.testButtonText}>TEST →</Text>
-      </TouchableOpacity>
+      </TouchableOpacity> */}
       
       <KeyboardDismissWrapper>
         <View style={styles.contentContainer}>

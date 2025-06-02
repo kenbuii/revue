@@ -8,23 +8,294 @@ export interface MediaItem {
   year?: string;
   image?: string;
   description?: string;
-  source: 'tmdb' | 'google_books' | 'popular';
+  source: 'tmdb' | 'google_books' | 'popular' | 'nyt_bestsellers';
   originalId?: string; // Keep original API ID for future reference
+  rating?: number; // For trending items
+  author?: string; // For books
+  director?: string; // For movies
 }
 
 // API configuration
 const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
 const TMDB_IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/w500';
 const GOOGLE_BOOKS_BASE_URL = 'https://www.googleapis.com/books/v1';
+const NYT_BOOKS_API = 'https://api.nytimes.com/svc/books/v3';
 
 class MediaSearchService {
   private tmdbApiKey: string | undefined;
   private googleBooksApiKey: string | undefined;
+  private nytApiKey: string | undefined;
 
   constructor() {
     // Get API keys from environment
     this.tmdbApiKey = Constants.expoConfig?.extra?.tmdbApiKey;
     this.googleBooksApiKey = Constants.expoConfig?.extra?.googleBooksApiKey;
+    this.nytApiKey = Constants.expoConfig?.extra?.nytApiKey;
+  }
+
+  /**
+   * Get trending movies from TMDB
+   */
+  async getTrendingMovies(): Promise<MediaItem[]> {
+    if (!this.tmdbApiKey) {
+      console.log('🔧 TMDb API key not configured - using fallback data');
+      return this.getFallbackTrendingMovies();
+    }
+
+    try {
+      const response = await fetch(
+        `${TMDB_BASE_URL}/trending/movie/day?api_key=${this.tmdbApiKey}`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`TMDb API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      return data.results
+        ?.slice(0, 10) // Limit to 10 trending movies
+        ?.map((item: any) => ({
+          id: `tmdb_movie_${item.id}`,
+          title: item.title,
+          type: 'movie' as const,
+          year: item.release_date ? new Date(item.release_date).getFullYear().toString() : undefined,
+          image: item.poster_path ? `${TMDB_IMAGE_BASE_URL}${item.poster_path}` : undefined,
+          description: item.overview,
+          source: 'tmdb' as const,
+          originalId: item.id.toString(),
+          rating: item.vote_average,
+        })) || [];
+
+    } catch (error) {
+      console.error('TMDb trending movies error:', error);
+      return this.getFallbackTrendingMovies();
+    }
+  }
+
+  /**
+   * Get trending TV shows from TMDB
+   */
+  async getTrendingTV(): Promise<MediaItem[]> {
+    if (!this.tmdbApiKey) {
+      console.log('🔧 TMDb API key not configured - using fallback data');
+      return this.getFallbackTrendingTV();
+    }
+
+    try {
+      const response = await fetch(
+        `${TMDB_BASE_URL}/trending/tv/day?api_key=${this.tmdbApiKey}`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`TMDb API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      return data.results
+        ?.slice(0, 10) // Limit to 10 trending TV shows
+        ?.map((item: any) => ({
+          id: `tmdb_tv_${item.id}`,
+          title: item.name,
+          type: 'tv' as const,
+          year: item.first_air_date ? new Date(item.first_air_date).getFullYear().toString() : undefined,
+          image: item.poster_path ? `${TMDB_IMAGE_BASE_URL}${item.poster_path}` : undefined,
+          description: item.overview,
+          source: 'tmdb' as const,
+          originalId: item.id.toString(),
+          rating: item.vote_average,
+        })) || [];
+
+    } catch (error) {
+      console.error('TMDb trending TV error:', error);
+      return this.getFallbackTrendingTV();
+    }
+  }
+
+  /**
+   * Get trending books from New York Times Bestsellers API
+   */
+  async getTrendingBooks(): Promise<MediaItem[]> {
+    if (!this.nytApiKey) {
+      console.log('🔧 NYT API key not configured - trying enhanced Google Books search');
+      return this.getEnhancedGoogleBooks();
+    }
+
+    try {
+      // Rotate between different NYT bestseller lists for variety
+      const bestsellerLists = [
+        'combined-print-and-e-book-fiction',
+        'combined-print-and-e-book-nonfiction',
+        'hardcover-fiction',
+        'hardcover-nonfiction',
+        'paperback-nonfiction',
+      ];
+      
+      const randomList = bestsellerLists[Math.floor(Math.random() * bestsellerLists.length)];
+      
+      console.log(`🏆 Fetching NYT bestsellers from: ${randomList}`);
+      
+      const response = await fetch(
+        `${NYT_BOOKS_API}/lists/current/${randomList}.json?api-key=${this.nytApiKey}`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`NYT Books API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      if (!data.results?.books) {
+        throw new Error('Invalid NYT API response structure');
+      }
+
+      return data.results.books
+        ?.slice(0, 10) // Limit to 10 books
+        ?.map((book: any) => ({
+          id: `nyt_${book.primary_isbn13 || book.primary_isbn10 || Math.random()}`,
+          title: book.title,
+          type: 'book' as const,
+          author: book.author,
+          description: book.description || `#${book.rank} on NYT ${data.results.display_name} list`,
+          image: book.book_image,
+          source: 'nyt_bestsellers' as const,
+          originalId: book.primary_isbn13 || book.primary_isbn10,
+          rating: this.calculateNYTRating(book.weeks_on_list, book.rank),
+          year: new Date().getFullYear().toString(), // Current year for bestsellers
+        })) || [];
+
+    } catch (error) {
+      console.error('NYT Books API error:', error);
+      console.log('📚 Falling back to enhanced Google Books search');
+      return this.getEnhancedGoogleBooks();
+    }
+  }
+
+  /**
+   * Calculate a rating score based on NYT bestseller metrics
+   */
+  private calculateNYTRating(weeksOnList: number, rank: number): number {
+    // Convert weeks on list and rank to a 1-5 rating scale
+    // More weeks on list = higher rating, lower rank number = higher rating
+    const weeksScore = Math.min(weeksOnList * 0.1, 2); // Up to 2 points for weeks
+    const rankScore = Math.max(3 - (rank * 0.2), 0.5); // Up to 3 points for rank (rank 1 = 3, rank 15 = 0.5)
+    return Math.min(weeksScore + rankScore, 5);
+  }
+
+  /**
+   * Enhanced Google Books search as fallback for trending books
+   */
+  private async getEnhancedGoogleBooks(): Promise<MediaItem[]> {
+    try {
+      // Use curated subjects and better filtering instead of "bestseller" search
+      const subjects = [
+        'fiction bestseller',
+        'popular fiction',
+        'award winning books',
+        'contemporary literature',
+        'bestselling authors'
+      ];
+      
+      const randomSubject = subjects[Math.floor(Math.random() * subjects.length)];
+      
+      const url = this.googleBooksApiKey 
+        ? `${GOOGLE_BOOKS_BASE_URL}/volumes?q=${encodeURIComponent(randomSubject)}&key=${this.googleBooksApiKey}&maxResults=20&orderBy=relevance&printType=books&filter=paid-ebooks`
+        : `${GOOGLE_BOOKS_BASE_URL}/volumes?q=${encodeURIComponent(randomSubject)}&maxResults=20&orderBy=relevance&printType=books&filter=paid-ebooks`;
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Google Books API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      if (!data.items) {
+        return this.getFallbackTrendingBooks();
+      }
+
+      // Filter for books with good ratings and published recently
+      const filteredBooks = data.items
+        .filter((item: any) => {
+          const volumeInfo = item.volumeInfo;
+          const publishedYear = volumeInfo.publishedDate ? 
+            new Date(volumeInfo.publishedDate).getFullYear() : 0;
+          
+          return (
+            volumeInfo.title &&
+            volumeInfo.authors &&
+            publishedYear >= 2020 && // Recent books
+            (volumeInfo.averageRating >= 4.0 || !volumeInfo.averageRating) &&
+            (volumeInfo.ratingsCount >= 50 || !volumeInfo.ratingsCount)
+          );
+        })
+        .slice(0, 10)
+        .map((item: any) => ({
+          id: `enhanced_book_${item.id}`,
+          title: item.volumeInfo.title,
+          type: 'book' as const,
+          year: item.volumeInfo.publishedDate ? 
+            new Date(item.volumeInfo.publishedDate).getFullYear().toString() : undefined,
+          image: item.volumeInfo.imageLinks?.thumbnail || item.volumeInfo.imageLinks?.smallThumbnail,
+          description: item.volumeInfo.description,
+          source: 'google_books' as const,
+          originalId: item.id,
+          author: item.volumeInfo.authors?.join(', '),
+          rating: item.volumeInfo.averageRating || 4.0,
+        }));
+
+      return filteredBooks.length > 0 ? filteredBooks : this.getFallbackTrendingBooks();
+
+    } catch (error) {
+      console.error('Enhanced Google Books search error:', error);
+      return this.getFallbackTrendingBooks();
+    }
+  }
+
+  /**
+   * Get all trending content in one call
+   */
+  async getAllTrending(): Promise<{ movies: MediaItem[], tv: MediaItem[], books: MediaItem[] }> {
+    try {
+      const [movies, tv, books] = await Promise.all([
+        this.getTrendingMovies(),
+        this.getTrendingTV(),
+        this.getTrendingBooks()
+      ]);
+
+      return { movies, tv, books };
+    } catch (error) {
+      console.error('Error fetching all trending:', error);
+      return {
+        movies: this.getFallbackTrendingMovies(),
+        tv: this.getFallbackTrendingTV(),
+        books: this.getFallbackTrendingBooks()
+      };
+    }
   }
 
   /**
@@ -240,6 +511,114 @@ class MediaSearchService {
         type: 'tv',
         source: 'popular',
         description: 'Acclaimed drama series',
+      },
+    ];
+  }
+
+  /**
+   * Fallback trending movies when API is unavailable
+   */
+  private getFallbackTrendingMovies(): MediaItem[] {
+    return [
+      {
+        id: 'trending_movie_1',
+        title: 'Oppenheimer',
+        type: 'movie',
+        year: '2023',
+        source: 'tmdb',
+        description: 'The story of J. Robert Oppenheimer and the Manhattan Project',
+        rating: 8.3,
+      },
+      {
+        id: 'trending_movie_2',
+        title: 'Barbie',
+        type: 'movie',
+        year: '2023',
+        source: 'tmdb',
+        description: 'A doll living in Barbieland gets expelled for being imperfect',
+        rating: 7.2,
+      },
+      {
+        id: 'trending_movie_3',
+        title: 'Spider-Man: Across the Spider-Verse',
+        type: 'movie',
+        year: '2023',
+        source: 'tmdb',
+        description: 'Miles Morales catapults across the Multiverse',
+        rating: 8.7,
+      },
+    ];
+  }
+
+  /**
+   * Fallback trending TV shows when API is unavailable
+   */
+  private getFallbackTrendingTV(): MediaItem[] {
+    return [
+      {
+        id: 'trending_tv_1',
+        title: 'House of the Dragon',
+        type: 'tv',
+        year: '2022',
+        source: 'tmdb',
+        description: 'The Targaryen civil war, set 200 years before Game of Thrones',
+        rating: 8.4,
+      },
+      {
+        id: 'trending_tv_2',
+        title: 'The Last of Us',
+        type: 'tv',
+        year: '2023',
+        source: 'tmdb',
+        description: 'Joel and Ellie navigate a post-apocalyptic world',
+        rating: 8.8,
+      },
+      {
+        id: 'trending_tv_3',
+        title: 'Wednesday',
+        type: 'tv',
+        year: '2022',
+        source: 'tmdb',
+        description: 'Wednesday Addams at Nevermore Academy',
+        rating: 8.1,
+      },
+    ];
+  }
+
+  /**
+   * Fallback trending books when API is unavailable
+   */
+  private getFallbackTrendingBooks(): MediaItem[] {
+    return [
+      {
+        id: 'trending_book_1',
+        title: 'Fourth Wing',
+        type: 'book',
+        year: '2023',
+        source: 'google_books',
+        description: 'A deadly war college where dragons choose their riders',
+        author: 'Rebecca Yarros',
+        rating: 4.5,
+      },
+      {
+        id: 'trending_book_2',
+        title: 'Tomorrow, and Tomorrow, and Tomorrow',
+        type: 'book',
+        year: '2022',
+        source: 'google_books',
+        description: 'A novel about friendship and video game design',
+        author: 'Gabrielle Zevin',
+        rating: 4.3,
+      },
+      {
+        id: 'trending_book_3',
+        title: 'The Seven Moons of Maali Almeida',
+        type: 'book',
+        year: '2022',
+        source: 'google_books',
+        description: 'A magical realist novel set in Sri Lanka',
+        author: 'Shehan Karunatilaka',
+        rating: 4.1,
       },
     ];
   }

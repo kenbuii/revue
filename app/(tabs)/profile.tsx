@@ -1,66 +1,15 @@
 import React from 'react';
-import { StyleSheet, Text, View, Image, ScrollView, TouchableOpacity, FlatList } from 'react-native';
+import { StyleSheet, Text, View, Image, ScrollView, TouchableOpacity, FlatList, ActivityIndicator, Alert, RefreshControl } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AppHeader from '@/components/AppHeader';
 import { router } from 'expo-router';
 import { useBookmarks } from '@/contexts/BookmarksContext';
+import { useUserProfile } from '@/contexts/UserProfileContext';
+import { useAuth } from '@/contexts/AuthContext';
+import DraggableMediaList from '@/components/DraggableMediaList';
 
-// Mock data
-const profileData = {
-  name: 'FIRST LASTNAME',
-  username: '@username',
-  bio: 'user post/content lorem ipsum Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry\'s standard dummy',
-  reviewCount: 20,
-  followers: 10,
-  following: 10
-};
-
-// TODO: Replace with data from Supabase when implementing backend
-// useEffect(() => {
-//   const fetchProfileData = async () => {
-//     // Get user profile data from Supabase
-//     // const { data: userData, error: userError } = await supabase
-//     //   .from('users')
-//     //   .select('*')
-//     //   .eq('id', userId)
-//     //   .single();
-//
-//     // Get user stats from Supabase
-//     // const { data: statsData, error: statsError } = await supabase
-//     //   .rpc('get_user_stats', { user_id: userId });
-//
-//     // Get user's current reads
-//     // const { data: onVueData, error: onVueError } = await supabase
-//     //   .from('user_books')
-//     //   .select('*, book:books(*)')
-//     //   .eq('user_id', userId)
-//     //   .eq('status', 'reading');
-//
-//     // Get user's favorite books
-//     // const { data: favoritesData, error: favoritesError } = await supabase
-//     //   .from('user_books')
-//     //   .select('*, book:books(*), review:reviews(*)')
-//     //   .eq('user_id', userId)
-//     //   .eq('is_favorite', true);
-//
-//     // Get user's recent reviews
-//     // const { data: reviewsData, error: reviewsError } = await supabase
-//     //   .from('reviews')
-//     //   .select('*, book:books(*)')
-//     //   .eq('user_id', userId)
-//     //   .order('created_at', { ascending: false })
-//     //   .limit(5);
-//   };
-//   fetchProfileData();
-// }, []);
-
-const onVueItems = [
-  { id: '1', title: 'Harry Potter', cover: 'https://m.media-amazon.com/images/I/51DF6ZR8G7L._AC_UF894,1000_QL80_.jpg', author: 'J.K. ROWLING' },
-  { id: '2', title: 'Pride & Prejudice', cover: 'https://m.media-amazon.com/images/I/71Q1tPupKjL._AC_UF1000,1000_QL80_.jpg', author: 'PRIDE & PREJUDICE' },
-  { id: '3', title: 'The Count of Monte Cristo', cover: 'https://m.media-amazon.com/images/I/51uLvJlKpNL.jpg', author: 'THE COUNT OF\nMONTECRISTO' },
-];
-
+// Mock data for sections that don't have backend yet
 const favoriteVues = [
   { id: '1', title: 'Fantastic Mr. Fox', cover: 'https://m.media-amazon.com/images/M/MV5BOGUwYTU4NGEtNDM4MS00NDRjLTkwNmQtOTkwMWMyMjhmMjdlXkEyXkFqcGdeQXVyMTMxODk2OTU@._V1_FMjpg_UX1000_.jpg', comment: 'wes anderson hater but this one is forever going to be one of my favori...' },
   { id: '2', title: 'The Count of Monte Cristo', cover: 'https://m.media-amazon.com/images/I/51uLvJlKpNL.jpg', comment: 'wes anderson hater but this one is forever going to be one of my favori...' },
@@ -86,6 +35,80 @@ const recentRevues = [
 
 export default function ProfileScreen() {
   const { bookmarkedPosts } = useBookmarks();
+  const { isAuthenticated } = useAuth();
+  const { 
+    profile, 
+    stats, 
+    mediaPreferences, 
+    recentReviews: userRecentReviews,
+    loadingProfile, 
+    loadingStats, 
+    loadingMedia,
+    profileError,
+    refreshAll,
+    removeMediaPreference,
+    updateMediaPreferencesOrder
+  } = useUserProfile();
+  
+  // Add bookmark removal handler
+  const { removeBookmark } = useBookmarks();
+  const [refreshing, setRefreshing] = React.useState(false);
+  
+  const handleRemoveBookmark = (postId: string, title: string) => {
+    Alert.alert(
+      'Remove Bookmark',
+      `Remove "${title}" from your bookmarks?`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: () => {
+            removeBookmark(postId);
+            // Optional: Add success feedback
+            Alert.alert(
+              'Bookmark Removed',
+              'The bookmark has been removed successfully.',
+              [{ text: 'OK' }],
+              { cancelable: true }
+            );
+          },
+        },
+      ]
+    );
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await refreshAll();
+    setRefreshing(false);
+  };
+  
+  // Debug logging in development
+  if (__DEV__) {
+    console.log('🔍 Profile Screen Debug:', {
+      isAuthenticated,
+      hasProfile: !!profile,
+      profileData: profile,
+      profileFields: {
+        id: profile?.id,
+        username: profile?.username,
+        display_name: profile?.display_name,
+        bio: profile?.bio,
+        avatar_url: profile?.avatar_url,
+        onboarding_completed: profile?.onboarding_completed,
+      },
+      loadingProfile,
+      profileError,
+      statsData: stats,
+      mediaPrefsCount: mediaPreferences.length,
+      mediaPrefsData: mediaPreferences,
+      loadingMedia
+    });
+  }
   
   const SettingsButton = () => (
     <TouchableOpacity 
@@ -96,41 +119,114 @@ export default function ProfileScreen() {
     </TouchableOpacity>
   );
 
-  // TODO: Implement follow/unfollow functionality with Supabase
-  // const handleFollow = async (userId) => {
-  //   // Add follower relationship to Supabase
-  //   // const { data, error } = await supabase
-  //   //   .from('follows')
-  //   //   .insert({ follower_id: currentUserId, following_id: userId });
-  // };
+  // Handle case where user is not authenticated
+  if (!isAuthenticated) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.headerContainer}>
+          <AppHeader rightComponent={<SettingsButton />} />
+        </View>
+        <View style={styles.unauthenticatedContainer}>
+          <Text style={styles.unauthenticatedText}>Please sign in to view your profile</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Show loading state
+  if (loadingProfile && !profile) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.headerContainer}>
+          <AppHeader rightComponent={<SettingsButton />} />
+        </View>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#004D00" />
+          <Text style={styles.loadingText}>Loading profile...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Show error state with fallback
+  if (profileError && !profile) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.headerContainer}>
+          <AppHeader rightComponent={<SettingsButton />} />
+        </View>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>Failed to load profile</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={refreshAll}>
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Get user display data
+  const displayName = profile?.display_name || 'User';
+  const username = profile?.username ? `@${profile.username}` : '@username';
+  const bio = profile?.bio || 'Welcome to my profile';
+  const avatarUrl = profile?.avatar_url;
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.headerContainer}>
         <AppHeader rightComponent={<SettingsButton />} />
       </View>
-      <ScrollView style={styles.scrollContent}>
+      <ScrollView 
+        style={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#004D00"
+            colors={['#004D00']}
+          />
+        }
+        showsVerticalScrollIndicator={false}
+      >
         {/* Profile Info */}
         <View style={styles.profileContainer}>
           <View style={styles.profileInfo}>
             <Image 
               style={styles.avatar} 
-              source={{ uri: 'https://via.placeholder.com/100' }} 
+              source={{ 
+                uri: avatarUrl || 'https://via.placeholder.com/100' 
+              }} 
             />
             <View style={styles.userInfo}>
-              <Text style={styles.name}>{profileData.name} <Text style={styles.username}>{profileData.username}</Text></Text>
-              <Text style={styles.bio}>{profileData.bio}</Text>
+              <View style={styles.nameContainer}>
+                <Text style={styles.name}>
+                  {displayName} <Text style={styles.username}>{username}</Text>
+                </Text>
+                <TouchableOpacity 
+                  style={styles.bookmarkButton}
+                  onPress={() => router.push('../bookmarks')}
+                >
+                  <Feather name="bookmark" size={20} color="#004D00" />
+                </TouchableOpacity>
+              </View>
+              <Text style={styles.bio}>{bio}</Text>
               <View style={styles.statsContainer}>
                 <View style={styles.statItem}>
-                  <Text style={styles.statNumber}>{profileData.reviewCount}</Text>
+                  <Text style={styles.statNumber}>
+                    {loadingStats ? '...' : stats.reviewCount}
+                  </Text>
                   <Text style={styles.statLabel}>revues</Text>
                 </View>
                 <View style={styles.statItem}>
-                  <Text style={styles.statNumber}>{profileData.followers}</Text>
+                  <Text style={styles.statNumber}>
+                    {loadingStats ? '...' : stats.followers}
+                  </Text>
                   <Text style={styles.statLabel}>followers</Text>
                 </View>
                 <View style={styles.statItem}>
-                  <Text style={styles.statNumber}>{profileData.following}</Text>
+                  <Text style={styles.statNumber}>
+                    {loadingStats ? '...' : stats.following}
+                  </Text>
                   <Text style={styles.statLabel}>following</Text>
                 </View>
               </View>
@@ -151,7 +247,17 @@ export default function ProfileScreen() {
                 <TouchableOpacity 
                   key={post.id} 
                   style={styles.bookmarkCard}
-                  onPress={() => router.push(`/post/${post.id}`)}
+                  onPress={() => router.push({
+                    pathname: '/media/[id]' as const,
+                    params: {
+                      id: post.media.id || post.id,
+                      title: post.media.title || 'Unknown Title',
+                      type: post.media.type || 'media',
+                      year: '', // Bookmarks don't currently store year
+                      image: post.media.cover || '',
+                      description: post.content || post.title || '',
+                    },
+                  })}
                 >
                   <Image source={{ uri: post.media.cover }} style={styles.mediaCover} />
                   <Text style={styles.mediaAuthor}>{post.media.title}</Text>
@@ -160,34 +266,45 @@ export default function ProfileScreen() {
                       {post.title || post.content}
                     </Text>
                   </View>
+                  
+                  {/* Add X button overlay for bookmark removal */}
+                  <TouchableOpacity
+                    style={styles.bookmarkRemoveButton}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      handleRemoveBookmark(post.id, post.title || post.media.title || 'Bookmark');
+                    }}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
+                    <View style={styles.bookmarkRemoveButtonBackground}>
+                      <Feather name="x" size={14} color="white" />
+                    </View>
+                  </TouchableOpacity>
                 </TouchableOpacity>
               ))}
             </ScrollView>
           </View>
         )}
 
-        {/* On Vue Section */}
+        {/* On Vue Section - Now with drag-and-drop and remove functionality */}
         <View style={styles.sectionContainer}>
           <Text style={styles.sectionTitle}>ON VUE</Text>
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.horizontalScrollContent}
-          >
-            {onVueItems.map(item => (
-              <TouchableOpacity 
-                key={item.id} 
-                style={styles.mediaCard}
-                onPress={() => router.push('/media/1')}
-              >
-                <Image source={{ uri: item.cover }} style={styles.mediaCover} />
-                <Text style={styles.mediaAuthor}>{item.title}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+          {loadingMedia ? (
+            <View style={styles.loadingSection}>
+              <ActivityIndicator size="small" color="#004D00" />
+              <Text style={styles.loadingSectionText}>Loading your media...</Text>
+            </View>
+          ) : (
+            <DraggableMediaList
+              mediaPreferences={mediaPreferences}
+              onRemove={removeMediaPreference}
+              onReorder={updateMediaPreferencesOrder}
+              loading={loadingMedia}
+            />
+          )}
         </View>
 
-        {/* Favorite Vues Section */}
+        {/* Favorite Vues Section - Using mock data for now */}
         <View style={styles.sectionContainer}>
           <Text style={styles.sectionTitle}>FAVORITE VUES</Text>
           <ScrollView 
@@ -211,25 +328,34 @@ export default function ProfileScreen() {
           </ScrollView>
         </View>
 
-        {/* Recent Revues */}
+        {/* Recent Revues - Using mock data for now, will use userRecentReviews when posts table is ready */}
         <View style={styles.sectionContainer}>
           <Text style={styles.sectionTitle}>RECENT REVUES</Text>
-          {recentRevues.map(revue => (
-            <TouchableOpacity key={revue.id} style={styles.revueItem}>
-              <View style={styles.revueImageContainer}>
-                <Image 
-                  source={{ uri: revue.cover }} 
-                  style={styles.revueCover}
-                  resizeMode="cover"
-                />
-              </View>
-              <View style={styles.revueContent}>
-                <Text style={styles.revueTitle}>{revue.title}</Text>
-                <Text style={styles.revueText} numberOfLines={4}>{revue.content}</Text>
-                <Text style={styles.revueTime}>{revue.time}</Text>
-              </View>
-            </TouchableOpacity>
-          ))}
+          {recentRevues.length > 0 ? (
+            recentRevues.map(revue => (
+              <TouchableOpacity key={revue.id} style={styles.revueItem}>
+                <View style={styles.revueImageContainer}>
+                  <Image 
+                    source={{ uri: revue.cover }} 
+                    style={styles.revueCover}
+                    resizeMode="cover"
+                  />
+                </View>
+                <View style={styles.revueContent}>
+                  <Text style={styles.revueTitle}>{revue.title}</Text>
+                  <Text style={styles.revueText} numberOfLines={4}>{revue.content}</Text>
+                  <Text style={styles.revueTime}>{revue.time}</Text>
+                </View>
+              </TouchableOpacity>
+            ))
+          ) : (
+            <View style={styles.emptySection}>
+              <Text style={styles.emptySectionText}>No recent reviews yet</Text>
+              <Text style={styles.emptySectionSubtext}>
+                Start writing reviews to see them here
+              </Text>
+            </View>
+          )}
         </View>
         
         <View style={styles.spacer} />
@@ -254,6 +380,79 @@ const styles = StyleSheet.create({
     padding: 8,
     marginRight: -8,
   },
+  unauthenticatedContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  unauthenticatedText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#666',
+    marginTop: 16,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  retryButton: {
+    backgroundColor: '#004D00',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  loadingSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 20,
+    paddingHorizontal: 20,
+  },
+  loadingSectionText: {
+    fontSize: 14,
+    color: '#666',
+    marginLeft: 8,
+  },
+  emptySection: {
+    paddingVertical: 20,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+  },
+  emptySectionText: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  emptySectionSubtext: {
+    fontSize: 12,
+    color: '#999',
+    textAlign: 'center',
+  },
   profileContainer: {
     paddingHorizontal: 20,
     marginBottom: 20,
@@ -274,10 +473,17 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
   },
+  nameContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
   name: {
     fontSize: 15,
     fontWeight: 'bold',
     marginBottom: 4,
+    flex: 1,
   },
   username: {
     fontWeight: 'normal',
@@ -411,5 +617,28 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     lineHeight: 16,
+  },
+  bookmarkButton: {
+    padding: 8,
+    backgroundColor: '#F8F6ED',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E8E8E8',
+    marginLeft: 12,
+  },
+  bookmarkRemoveButton: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    padding: 4,
+    borderRadius: 12,
+  },
+  bookmarkRemoveButtonBackground: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#666',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

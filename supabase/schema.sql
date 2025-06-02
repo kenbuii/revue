@@ -47,6 +47,24 @@ CREATE TABLE IF NOT EXISTS user_connections (
     UNIQUE(user_id, friend_id)
 );
 
+-- User bookmarks table
+CREATE TABLE IF NOT EXISTS user_bookmarks (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES user_profiles(id) ON DELETE CASCADE,
+    post_id TEXT NOT NULL, -- ID of the bookmarked post/media
+    media_id TEXT, -- Reference to media being reviewed
+    media_title TEXT NOT NULL,
+    media_type TEXT, -- 'movie', 'tv', 'book', etc.
+    media_cover TEXT, -- Cover image URL
+    post_title TEXT, -- Title of the review/post
+    post_content TEXT, -- Content of the review/post
+    post_author_name TEXT, -- Name of the post author
+    post_author_avatar TEXT, -- Avatar of the post author
+    post_date TIMESTAMP WITH TIME ZONE,
+    bookmarked_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(user_id, post_id)
+);
+
 -- Contact invitations table (for users not yet on platform)
 CREATE TABLE IF NOT EXISTS contact_invitations (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -63,6 +81,8 @@ CREATE INDEX IF NOT EXISTS idx_user_media_preferences_user_id ON user_media_pref
 CREATE INDEX IF NOT EXISTS idx_user_media_preferences_media_type ON user_media_preferences(media_type);
 CREATE INDEX IF NOT EXISTS idx_user_connections_user_id ON user_connections(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_connections_friend_id ON user_connections(friend_id);
+CREATE INDEX IF NOT EXISTS idx_user_bookmarks_user_id ON user_bookmarks(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_bookmarks_bookmarked_at ON user_bookmarks(bookmarked_at);
 CREATE INDEX IF NOT EXISTS idx_contact_invitations_email_hash ON contact_invitations(email_hash);
 
 -- Trigger to automatically update updated_at timestamp
@@ -82,11 +102,17 @@ CREATE TRIGGER update_user_profiles_updated_at
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-    INSERT INTO public.user_profiles (id, username, email_hash)
+    INSERT INTO public.user_profiles (
+        id, 
+        username, 
+        display_name,
+        email_hash
+    )
     VALUES (
         NEW.id, 
-        NEW.raw_user_meta_data->>'username',
-        NEW.raw_user_meta_data->>'email_hash'
+        COALESCE(NEW.raw_user_meta_data->>'username', split_part(NEW.email, '@', 1)),
+        COALESCE(NEW.raw_user_meta_data->>'display_name', NEW.raw_user_meta_data->>'username', split_part(NEW.email, '@', 1)),
+        COALESCE(NEW.raw_user_meta_data->>'email_hash', encode(digest(NEW.email, 'sha256'), 'hex'))
     );
     RETURN NEW;
 END;
@@ -146,9 +172,107 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- RPC function to get user's bookmarks
+CREATE OR REPLACE FUNCTION public.get_user_bookmarks(target_user_id UUID)
+RETURNS TABLE (
+    id UUID,
+    post_id TEXT,
+    media_id TEXT,
+    media_title TEXT,
+    media_type TEXT,
+    media_cover TEXT,
+    post_title TEXT,
+    post_content TEXT,
+    post_author_name TEXT,
+    post_author_avatar TEXT,
+    post_date TIMESTAMP WITH TIME ZONE,
+    bookmarked_at TIMESTAMP WITH TIME ZONE
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        ub.id,
+        ub.post_id,
+        ub.media_id,
+        ub.media_title,
+        ub.media_type,
+        ub.media_cover,
+        ub.post_title,
+        ub.post_content,
+        ub.post_author_name,
+        ub.post_author_avatar,
+        ub.post_date,
+        ub.bookmarked_at
+    FROM user_bookmarks ub
+    WHERE ub.user_id = target_user_id
+    ORDER BY ub.bookmarked_at DESC;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- RPC function to add a bookmark
+CREATE OR REPLACE FUNCTION public.add_bookmark(
+    target_user_id UUID,
+    p_post_id TEXT,
+    p_media_id TEXT DEFAULT NULL,
+    p_media_title TEXT DEFAULT '',
+    p_media_type TEXT DEFAULT NULL,
+    p_media_cover TEXT DEFAULT NULL,
+    p_post_title TEXT DEFAULT NULL,
+    p_post_content TEXT DEFAULT NULL,
+    p_post_author_name TEXT DEFAULT '',
+    p_post_author_avatar TEXT DEFAULT NULL,
+    p_post_date TIMESTAMP WITH TIME ZONE DEFAULT NULL
+)
+RETURNS JSONB AS $$
+BEGIN
+    INSERT INTO user_bookmarks (
+        user_id,
+        post_id,
+        media_id,
+        media_title,
+        media_type,
+        media_cover,
+        post_title,
+        post_content,
+        post_author_name,
+        post_author_avatar,
+        post_date
+    ) VALUES (
+        target_user_id,
+        p_post_id,
+        p_media_id,
+        p_media_title,
+        p_media_type,
+        p_media_cover,
+        p_post_title,
+        p_post_content,
+        p_post_author_name,
+        p_post_author_avatar,
+        p_post_date
+    ) ON CONFLICT (user_id, post_id) DO NOTHING;
+
+    RETURN jsonb_build_object('success', true, 'bookmarked_at', NOW());
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- RPC function to remove a bookmark
+CREATE OR REPLACE FUNCTION public.remove_bookmark(
+    target_user_id UUID,
+    p_post_id TEXT
+)
+RETURNS JSONB AS $$
+BEGIN
+    DELETE FROM user_bookmarks 
+    WHERE user_id = target_user_id AND post_id = p_post_id;
+
+    RETURN jsonb_build_object('success', true, 'removed_at', NOW());
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 -- RPC function to save user onboarding data
 CREATE OR REPLACE FUNCTION public.save_user_onboarding_data(
     target_user_id UUID,
+    p_username TEXT DEFAULT NULL,
     p_display_name TEXT DEFAULT NULL,
     p_avatar_url TEXT DEFAULT NULL,
     p_onboarding_completed BOOLEAN DEFAULT NULL,
@@ -162,6 +286,7 @@ DECLARE
 BEGIN
     -- Update user profile
     UPDATE user_profiles SET
+        username = COALESCE(p_username, username),
         display_name = COALESCE(p_display_name, display_name),
         avatar_url = COALESCE(p_avatar_url, avatar_url),
         onboarding_completed = COALESCE(p_onboarding_completed, onboarding_completed),
@@ -220,6 +345,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_media_preferences ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_connections ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_bookmarks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE contact_invitations ENABLE ROW LEVEL SECURITY;
 
 -- Users can read their own profile and public profiles
@@ -251,4 +377,16 @@ CREATE POLICY "Users can manage own connections" ON user_connections
 
 -- Users can manage their own invitations
 CREATE POLICY "Users can manage own invitations" ON contact_invitations
-    FOR ALL USING (auth.uid() = inviter_id); 
+    FOR ALL USING (auth.uid() = inviter_id);
+
+-- Users can manage their own connections
+CREATE POLICY "Users can view their own connections" ON user_connections FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can manage their own connections" ON user_connections FOR ALL USING (auth.uid() = user_id);
+
+-- Users can manage their own bookmarks
+CREATE POLICY "Users can view their own bookmarks" ON user_bookmarks FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can manage their own bookmarks" ON user_bookmarks FOR ALL USING (auth.uid() = user_id);
+
+-- Contact invitations policies
+CREATE POLICY "Users can view their own contact invitations" ON contact_invitations FOR SELECT USING (auth.uid() = inviter_id);
+CREATE POLICY "Users can manage their own contact invitations" ON contact_invitations FOR ALL USING (auth.uid() = inviter_id); 

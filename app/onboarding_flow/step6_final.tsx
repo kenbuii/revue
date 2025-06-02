@@ -48,9 +48,9 @@ export default function Step6FinalScreen() {
       </TouchableOpacity>
       
       {/* TODO: remove before deploying - test navigation button */}
-      <TouchableOpacity style={styles.testButton} onPress={handleTestNext}>
+      {/* <TouchableOpacity style={styles.testButton} onPress={handleTestNext}>
         <Text style={styles.testButtonText}>TEST →</Text>
-      </TouchableOpacity>
+      </TouchableOpacity> */}
       
       <View style={styles.content}>
         {/* Top left icon */}

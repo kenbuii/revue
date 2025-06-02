@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View, ScrollView, Dimensions, NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View, ScrollView, Dimensions, NativeSyntheticEvent, NativeScrollEvent, RefreshControl } from 'react-native';
 import PostCard from '@/components/PostCard';
 import { samplePosts } from '@/constants/mockData';
 
@@ -7,6 +7,7 @@ type TabType = 'forYou' | 'friends';
 
 export default function FeedTabs() {
   const [activeTab, setActiveTab] = useState<TabType>('forYou');
+  const [refreshing, setRefreshing] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
   const { width: screenWidth } = Dimensions.get('window');
 
@@ -24,6 +25,16 @@ export default function FeedTabs() {
       x: tab === 'friends' ? screenWidth : 0,
       animated: true,
     });
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    
+    // Simulate loading time for refresh
+    // In a real app, this would trigger post data refetch
+    setTimeout(() => {
+      setRefreshing(false);
+    }, 1000);
   };
 
   return (
@@ -56,14 +67,36 @@ export default function FeedTabs() {
         contentContainerStyle={styles.scrollContent}
       >
         {/* For You Tab */}
-        <ScrollView style={[styles.tabContent, { width: screenWidth }]}>
+        <ScrollView 
+          style={[styles.tabContent, { width: screenWidth }]}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor="#004D00"
+              colors={['#004D00']}
+            />
+          }
+          showsVerticalScrollIndicator={false}
+        >
           {samplePosts.map((post) => (
             <PostCard key={post.id} post={post} />
           ))}
         </ScrollView>
 
         {/* Friends + Following Tab */}
-        <ScrollView style={[styles.tabContent, { width: screenWidth }]}>
+        <ScrollView 
+          style={[styles.tabContent, { width: screenWidth }]}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor="#004D00"
+              colors={['#004D00']}
+            />
+          }
+          showsVerticalScrollIndicator={false}
+        >
           {samplePosts.map((post) => (
             <PostCard key={post.id} post={post} />
           ))}

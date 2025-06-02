@@ -5,10 +5,12 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { BookmarksProvider } from '@/contexts/BookmarksContext';
+import { UserProfileProvider } from '@/contexts/UserProfileContext';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -33,20 +35,32 @@ export default function RootLayout() {
   }
 
   return (
-    <AuthProvider>
-      <BookmarksProvider>
-        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-          <Stack>
-            <Stack.Screen name="onboarding_flow" options={{ headerShown: false }} />
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="(post_flow)" options={{ headerShown: false }} />
-            <Stack.Screen name="post" options={{ headerShown: false }} />
-            <Stack.Screen name="settings" options={{ headerShown: false }} />
-            <Stack.Screen name="+not-found" />
-          </Stack>
-          <StatusBar style="auto" />
-        </ThemeProvider>
-      </BookmarksProvider>
-    </AuthProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <AuthProvider>
+        <UserProfileProvider>
+          <BookmarksProvider>
+            <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+              <Stack>
+                <Stack.Screen name="onboarding_flow" options={{ headerShown: false }} />
+                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                <Stack.Screen name="(post_flow)" options={{ headerShown: false }} />
+                <Stack.Screen name="post" options={{ headerShown: false }} />
+                <Stack.Screen 
+                  name="media" 
+                  options={{ 
+                    headerShown: false,
+                    presentation: 'modal'
+                  }} 
+                />
+                <Stack.Screen name="settings" options={{ headerShown: false }} />
+                <Stack.Screen name="bookmarks" options={{ headerShown: false }} />
+                <Stack.Screen name="+not-found" />
+              </Stack>
+              <StatusBar style="auto" />
+            </ThemeProvider>
+          </BookmarksProvider>
+        </UserProfileProvider>
+      </AuthProvider>
+    </GestureHandlerRootView>
   );
 }

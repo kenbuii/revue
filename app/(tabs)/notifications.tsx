@@ -1,5 +1,5 @@
-import React from 'react';
-import { StyleSheet, Text, View, Image, ScrollView, TouchableOpacity, FlatList, StatusBar } from 'react-native';
+import React, { useState } from 'react';
+import { StyleSheet, Text, View, Image, ScrollView, TouchableOpacity, FlatList, StatusBar, RefreshControl } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -105,6 +105,7 @@ const notificationData: NotificationItem[] = [
 
 export default function NotificationsScreen() {
   const router = useRouter();
+  const [refreshing, setRefreshing] = useState(false);
 
   // TODO: Implement fetch from Supabase when backend is ready
   // useEffect(() => {
@@ -117,6 +118,16 @@ export default function NotificationsScreen() {
   //   };
   //   fetchNotifications();
   // }, []);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    
+    // Simulate loading time for refresh
+    // In a real app, this would trigger notification data refetch
+    setTimeout(() => {
+      setRefreshing(false);
+    }, 1000);
+  };
 
   const renderNotificationItem = ({ item }: { item: NotificationItem }) => {
     // Review notification
@@ -221,6 +232,14 @@ export default function NotificationsScreen() {
           keyExtractor={item => item.id}
           contentContainerStyle={styles.listContainer}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor="#004D00"
+              colors={['#004D00']}
+            />
+          }
         />
       </SafeAreaView>
     </>

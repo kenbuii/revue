@@ -201,10 +201,11 @@ class AuthService {
         return { error };
       }
 
-      // Clear any local storage
+      // Clear all local storage related to authentication and onboarding
       await AsyncStorage.removeItem('onboarding_data');
+      await AsyncStorage.removeItem('onboarding_completed');
       
-      console.log('✅ User signed out successfully');
+      console.log('✅ User signed out successfully - all local data cleared');
       return { error: undefined };
     } catch (err) {
       console.error('Sign out failed:', err);
@@ -352,23 +353,20 @@ class AuthService {
       const { session } = await this.getCurrentSession();
       const token = session?.access_token || supabaseAnonKey;
 
-      // Prepare data for Supabase function
+      // Prepare data for Supabase function with parameters that ACTUALLY exist in the database
       const payload: any = {
         target_user_id: userId,
+        // Parameters that actually exist in the deployed Supabase function:
+        p_avatar_url: data.profileImageUrl || null,
+        p_contact_sync_enabled: data.contactsSynced || false,
+        p_display_name: data.displayName || null,
+        p_media_preferences: data.selectedMedia || [],
+        p_onboarding_completed: data.onboarding_completed || false,
       };
 
-      // Map local data to Supabase fields
-      if (data.displayName) payload.p_display_name = data.displayName;
-      if (data.profileImageUrl) payload.p_avatar_url = data.profileImageUrl;
-      if (data.onboarding_completed !== undefined) payload.p_onboarding_completed = data.onboarding_completed;
-      if (data.contactsSynced !== undefined) payload.p_contact_sync_enabled = data.contactsSynced;
-      
-      // Handle media preferences
-      if (data.selectedMedia && Array.isArray(data.selectedMedia)) {
-        payload.p_media_preferences = data.selectedMedia;
-      }
+      // Note: p_username is NOT in the deployed function, so we'll save it separately
 
-      console.log('💾 Saving onboarding data to Supabase...');
+      console.log('💾 Saving onboarding data to Supabase (excluding username - will save separately)...', payload);
 
       const response = await fetch(`${supabaseUrl}/rest/v1/rpc/save_user_onboarding_data`, {
         method: 'POST',
@@ -390,9 +388,59 @@ class AuthService {
       const result = await response.json();
       console.log('✅ Onboarding data saved to Supabase:', result);
 
+      // Save username separately since it's not in the RPC function
+      if (data.username) {
+        await this.saveUsernameDirectly(userId, data.username);
+      }
+
     } catch (error) {
       console.error('❌ Error saving to Supabase:', error);
       // Don't throw - graceful degradation, local storage still works
+    }
+  }
+
+  /**
+   * Save username directly to user_profiles table (since RPC function doesn't handle it)
+   */
+  private async saveUsernameDirectly(userId: string, username: string): Promise<void> {
+    try {
+      const supabaseUrl = Constants.expoConfig?.extra?.supabaseUrl;
+      const supabaseAnonKey = Constants.expoConfig?.extra?.supabaseAnonKey;
+      
+      if (!supabaseUrl || !supabaseAnonKey) {
+        console.log('🔧 Supabase configuration missing - skipping username save');
+        return;
+      }
+
+      // Get auth token
+      const { session } = await this.getCurrentSession();
+      const token = session?.access_token || supabaseAnonKey;
+
+      console.log('💾 Saving username directly to user_profiles table...', { userId, username });
+
+      const response = await fetch(`${supabaseUrl}/rest/v1/user_profiles?id=eq.${userId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': supabaseAnonKey,
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          username: username,
+          updated_at: new Date().toISOString()
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.text();
+        console.error('❌ Username save error:', response.status, errorData);
+        return;
+      }
+
+      console.log('✅ Username saved directly to database');
+
+    } catch (error) {
+      console.error('❌ Error saving username directly:', error);
     }
   }
 

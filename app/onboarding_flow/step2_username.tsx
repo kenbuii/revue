@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/contexts/AuthContext';
 import KeyboardDismissWrapper from '@/components/KeyboardDismissWrapper';
+import { AuthDebugger } from '@/lib/authDebug';
 
 // Password strength levels
 type PasswordStrength = 'weak' | 'medium' | 'strong';
@@ -36,6 +37,29 @@ export default function Step2UsernameScreen() {
     hasUppercase: false,
     hasSpecialChar: false,
   });
+
+  // Quick fix for routing issue
+  const handleFixRouting = async () => {
+    console.log('🚨 EMERGENCY FIX: Setting onboarding as completed...');
+    try {
+      const result = await AuthDebugger.fixOnboardingCompletion();
+      if (result.success) {
+        Alert.alert('Fixed!', 'Routing issue fixed! You should now be able to access the main app.', [
+          {
+            text: 'Go to Main App',
+            onPress: () => {
+              router.replace('/(tabs)');
+            }
+          }
+        ]);
+      } else {
+        Alert.alert('Error', result.error || 'Fix failed');
+      }
+    } catch (error) {
+      console.error('Emergency fix error:', error);
+      Alert.alert('Error', 'Emergency fix failed');
+    }
+  };
 
   // Load existing data
   useEffect(() => {
@@ -285,10 +309,17 @@ export default function Step2UsernameScreen() {
         <Text style={styles.backButtonText}>←</Text>
       </TouchableOpacity>
       
+      {/* EMERGENCY FIX BUTTON - Development only */}
+      {/* {__DEV__ && (
+        <TouchableOpacity style={styles.emergencyFixButton} onPress={handleFixRouting}>
+          <Text style={styles.emergencyFixButtonText}>🚨 FIX ROUTING</Text>
+        </TouchableOpacity>
+      )} */}
+      
       {/* TODO: remove before deploying - test navigation button */}
-      <TouchableOpacity style={styles.testButton} onPress={handleTestNext}>
+      {/* <TouchableOpacity style={styles.testButton} onPress={handleTestNext}>
         <Text style={styles.testButtonText}>TEST →</Text>
-      </TouchableOpacity>
+      </TouchableOpacity> */}
       
       <KeyboardDismissWrapper>
         <View style={styles.contentContainer}>
@@ -313,7 +344,7 @@ export default function Step2UsernameScreen() {
                   ]}
                   value={email}
                   onChangeText={handleEmailChange}
-                  placeholder="Enter email"
+                  placeholder=""
                   autoCapitalize="none"
                   keyboardType="email-address"
                   autoComplete="email"
@@ -389,6 +420,21 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#142D0A',
     fontFamily: 'LibreBaskerville_400Regular',
+  },
+  emergencyFixButton: {
+    position: 'absolute',
+    top: 60,
+    right: 130,
+    zIndex: 1,
+    backgroundColor: '#00AA00',
+    borderRadius: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  emergencyFixButtonText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: 'bold',
   },
   testButton: {
     position: 'absolute',

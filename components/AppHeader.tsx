@@ -9,6 +9,12 @@ interface AppHeaderProps {
   title?: string;
   showSearchBar?: boolean;
   rightComponent?: React.ReactNode;
+  searchValue?: string;
+  onSearchChange?: (text: string) => void;
+  onSearchSubmit?: (text: string) => void;
+  onSearchFocus?: () => void;
+  onSearchBlur?: () => void;
+  searchPlaceholder?: string;
 }
 
 export default function AppHeader({ 
@@ -16,9 +22,21 @@ export default function AppHeader({
   showLogo = true, 
   title, 
   showSearchBar = false,
-  rightComponent
+  rightComponent,
+  searchValue = '',
+  onSearchChange,
+  onSearchSubmit,
+  onSearchFocus,
+  onSearchBlur,
+  searchPlaceholder = 'Search movies, TV shows, books...'
 }: AppHeaderProps) {
   const router = useRouter();
+
+  const handleSearchSubmit = () => {
+    if (onSearchSubmit && searchValue.trim()) {
+      onSearchSubmit(searchValue.trim());
+    }
+  };
 
   return (
     <>
@@ -53,10 +71,19 @@ export default function AppHeader({
           <View style={styles.searchInputContainer}>
             <TextInput
               style={styles.searchInput}
-              placeholder="Search"
+              placeholder={searchPlaceholder}
               placeholderTextColor="#666"
+              value={searchValue}
+              onChangeText={onSearchChange}
+              onSubmitEditing={handleSearchSubmit}
+              onFocus={onSearchFocus}
+              onBlur={onSearchBlur}
+              returnKeyType="search"
+              clearButtonMode="while-editing"
             />
-            <Feather name="search" size={20} color="#666" style={styles.searchIcon} />
+            <TouchableOpacity onPress={handleSearchSubmit} style={styles.searchButton}>
+              <Feather name="search" size={20} color="#666" />
+            </TouchableOpacity>
           </View>
         </View>
       )}
@@ -128,7 +155,8 @@ const styles = StyleSheet.create({
     height: 40,
     fontSize: 16,
   },
-  searchIcon: {
-    marginLeft: 10,
+  searchButton: {
+    padding: 4,
+    marginLeft: 8,
   },
 }); 
