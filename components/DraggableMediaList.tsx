@@ -118,17 +118,29 @@ export default function DraggableMediaList({
           {/* Media content */}
           <TouchableOpacity 
             style={styles.mediaContent}
-            onPress={() => router.push({
-              pathname: '/media/[id]',
-              params: {
-                id: item.media_id,
+            onPress={() => {
+              console.log('🎬 Media pressed, navigating to media detail page');
+              console.log('🎬 Item data being passed:', {
+                media_id: item.media_id,
                 title: item.title,
-                type: item.media_type,
-                year: item.year || '',
-                image: item.image_url || '',
-                description: item.description || '',
-              }
-            })}
+                media_type: item.media_type,
+                year: item.year,
+                image_url: item.image_url,
+                description: item.description
+              });
+              
+              router.push({
+                pathname: '/media/[id]',
+                params: {
+                  id: item.media_id,
+                  title: item.title,
+                  type: item.media_type || 'movie', // Safe fallback
+                  year: item.year || '',
+                  image: item.image_url || '',
+                  description: item.description || '',
+                }
+              });
+            }}
             disabled={isActive}
           >
             <Image 

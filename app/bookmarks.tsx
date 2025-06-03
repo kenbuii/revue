@@ -44,15 +44,20 @@ export default function BookmarksScreen() {
         {
           text: 'Remove',
           style: 'destructive',
-          onPress: () => {
-            removeBookmark(postId);
-            // Success feedback
-            Alert.alert(
-              'Bookmark Removed',
-              'The bookmark has been removed successfully.',
-              [{ text: 'OK' }],
-              { cancelable: true }
-            );
+          onPress: async () => {
+            try {
+              await removeBookmark(postId);
+              // Success feedback
+              Alert.alert(
+                'Bookmark Removed',
+                'The bookmark has been removed successfully.',
+                [{ text: 'OK' }],
+                { cancelable: true }
+              );
+            } catch (error) {
+              console.error('Error removing bookmark:', error);
+              Alert.alert('Error', 'Failed to remove bookmark. Please try again.');
+            }
           },
         },
       ]

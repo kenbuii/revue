@@ -348,6 +348,21 @@ ALTER TABLE user_connections ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_bookmarks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE contact_invitations ENABLE ROW LEVEL SECURITY;
 
+-- Drop existing policies if they exist (to allow re-running schema)
+DROP POLICY IF EXISTS "Users can view own profile" ON user_profiles;
+DROP POLICY IF EXISTS "Users can view public profiles" ON user_profiles;
+DROP POLICY IF EXISTS "Users can update own profile" ON user_profiles;
+DROP POLICY IF EXISTS "Users can manage own media preferences" ON user_media_preferences;
+DROP POLICY IF EXISTS "Users can view public media preferences" ON user_media_preferences;
+DROP POLICY IF EXISTS "Users can manage own connections" ON user_connections;
+DROP POLICY IF EXISTS "Users can view their own connections" ON user_connections;
+DROP POLICY IF EXISTS "Users can manage their own connections" ON user_connections;
+DROP POLICY IF EXISTS "Users can view their own bookmarks" ON user_bookmarks;
+DROP POLICY IF EXISTS "Users can manage their own bookmarks" ON user_bookmarks;
+DROP POLICY IF EXISTS "Users can view their own contact invitations" ON contact_invitations;
+DROP POLICY IF EXISTS "Users can manage their own contact invitations" ON contact_invitations;
+DROP POLICY IF EXISTS "Users can manage own invitations" ON contact_invitations;
+
 -- Users can read their own profile and public profiles
 CREATE POLICY "Users can view own profile" ON user_profiles
     FOR SELECT USING (auth.uid() = id);
@@ -372,14 +387,6 @@ CREATE POLICY "Users can view public media preferences" ON user_media_preference
     );
 
 -- Users can manage their own connections
-CREATE POLICY "Users can manage own connections" ON user_connections
-    FOR ALL USING (auth.uid() = user_id OR auth.uid() = friend_id);
-
--- Users can manage their own invitations
-CREATE POLICY "Users can manage own invitations" ON contact_invitations
-    FOR ALL USING (auth.uid() = inviter_id);
-
--- Users can manage their own connections
 CREATE POLICY "Users can view their own connections" ON user_connections FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Users can manage their own connections" ON user_connections FOR ALL USING (auth.uid() = user_id);
 
@@ -389,4 +396,360 @@ CREATE POLICY "Users can manage their own bookmarks" ON user_bookmarks FOR ALL U
 
 -- Contact invitations policies
 CREATE POLICY "Users can view their own contact invitations" ON contact_invitations FOR SELECT USING (auth.uid() = inviter_id);
-CREATE POLICY "Users can manage their own contact invitations" ON contact_invitations FOR ALL USING (auth.uid() = inviter_id); 
+CREATE POLICY "Users can manage their own contact invitations" ON contact_invitations FOR ALL USING (auth.uid() = inviter_id);
+
+-- ============================================================================
+-- COMMUNITY MEDIA FEATURES EXTENSION
+-- Tables and functions for media community stats and reviews
+-- ============================================================================
+
+-- Central media items table for consistent media metadata
+CREATE TABLE IF NOT EXISTS media_items (
+    id TEXT PRIMARY KEY, -- Consistent media_id (e.g., "tmdb_movie_123", "book_456")
+    title TEXT NOT NULL,
+    media_type TEXT NOT NULL CHECK (media_type IN ('movie', 'tv', 'book')),
+    year TEXT,
+    image_url TEXT,
+    description TEXT,
+    author TEXT, -- For books
+    director TEXT, -- For movies/TV
+    genre TEXT,
+    source TEXT NOT NULL CHECK (source IN ('tmdb', 'google_books', 'popular')),
+    original_api_id TEXT, -- Original ID from external API
+    metadata JSONB, -- Additional metadata as needed
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Posts/Reviews table for user-generated content about media
+CREATE TABLE IF NOT EXISTS posts (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES user_profiles(id) ON DELETE CASCADE,
+    media_id TEXT REFERENCES media_items(id),
+    title TEXT, -- Optional post title
+    content TEXT NOT NULL,
+    rating DECIMAL(3,1) CHECK (rating >= 0 AND rating <= 10), -- 0.0 to 10.0 rating
+    content_type TEXT DEFAULT 'text' CHECK (content_type IN ('text', 'image', 'video')),
+    tags TEXT[], -- Array of tags
+    like_count INTEGER DEFAULT 0,
+    comment_count INTEGER DEFAULT 0,
+    bookmark_count INTEGER DEFAULT 0,
+    is_public BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- User reading status tracking (extends user_media_preferences)
+-- Add status column to existing user_media_preferences if it doesn't exist
+DO $$ 
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'user_media_preferences' AND column_name = 'status'
+    ) THEN
+        ALTER TABLE user_media_preferences 
+        ADD COLUMN status TEXT DEFAULT 'reading' CHECK (status IN ('reading', 'want_to_read', 'completed', 'dropped', 'on_hold'));
+    END IF;
+END $$;
+
+-- Post likes table for tracking who liked what
+CREATE TABLE IF NOT EXISTS post_likes (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES user_profiles(id) ON DELETE CASCADE,
+    post_id UUID REFERENCES posts(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(user_id, post_id)
+);
+
+-- Post comments table
+CREATE TABLE IF NOT EXISTS post_comments (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES user_profiles(id) ON DELETE CASCADE,
+    post_id UUID REFERENCES posts(id) ON DELETE CASCADE,
+    parent_comment_id UUID REFERENCES post_comments(id) ON DELETE CASCADE, -- For nested comments
+    content TEXT NOT NULL,
+    like_count INTEGER DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create indexes for performance
+CREATE INDEX IF NOT EXISTS idx_media_items_media_type ON media_items(media_type);
+CREATE INDEX IF NOT EXISTS idx_media_items_source ON media_items(source);
+CREATE INDEX IF NOT EXISTS idx_posts_user_id ON posts(user_id);
+CREATE INDEX IF NOT EXISTS idx_posts_media_id ON posts(media_id);
+CREATE INDEX IF NOT EXISTS idx_posts_created_at ON posts(created_at);
+CREATE INDEX IF NOT EXISTS idx_posts_rating ON posts(rating);
+CREATE INDEX IF NOT EXISTS idx_user_media_preferences_status ON user_media_preferences(status);
+CREATE INDEX IF NOT EXISTS idx_user_media_preferences_media_id ON user_media_preferences(media_id);
+CREATE INDEX IF NOT EXISTS idx_post_likes_post_id ON post_likes(post_id);
+CREATE INDEX IF NOT EXISTS idx_post_likes_user_id ON post_likes(user_id);
+CREATE INDEX IF NOT EXISTS idx_post_comments_post_id ON post_comments(post_id);
+CREATE INDEX IF NOT EXISTS idx_post_comments_user_id ON post_comments(user_id);
+
+-- Add updated_at triggers for new tables
+CREATE TRIGGER update_media_items_updated_at 
+    BEFORE UPDATE ON media_items 
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_posts_updated_at 
+    BEFORE UPDATE ON posts 
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_post_comments_updated_at 
+    BEFORE UPDATE ON post_comments 
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================================================
+-- COMMUNITY STATISTICS AND DISCOVERY FUNCTIONS
+-- ============================================================================
+
+-- Function to get comprehensive media community stats
+CREATE OR REPLACE FUNCTION public.get_media_community_stats(p_media_id TEXT)
+RETURNS JSONB AS $$
+DECLARE
+    total_revues INTEGER;
+    avg_rating DECIMAL(3,1);
+    reading_count INTEGER;
+    want_to_read_count INTEGER;
+    completed_count INTEGER;
+    result JSONB;
+BEGIN
+    -- Count total reviews for this media
+    SELECT COUNT(*) INTO total_revues
+    FROM posts 
+    WHERE media_id = p_media_id AND is_public = TRUE;
+
+    -- Calculate average rating
+    SELECT ROUND(AVG(rating)::numeric, 1) INTO avg_rating
+    FROM posts 
+    WHERE media_id = p_media_id AND rating IS NOT NULL AND is_public = TRUE;
+
+    -- Count users currently reading
+    SELECT COUNT(*) INTO reading_count
+    FROM user_media_preferences 
+    WHERE media_id = p_media_id AND status = 'reading';
+
+    -- Count users who want to read (from bookmarks + want_to_read status)
+    SELECT COUNT(DISTINCT user_id) INTO want_to_read_count
+    FROM (
+        SELECT user_id FROM user_bookmarks WHERE media_id = p_media_id
+        UNION
+        SELECT user_id FROM user_media_preferences WHERE media_id = p_media_id AND status = 'want_to_read'
+    ) combined;
+
+    -- Count users who completed
+    SELECT COUNT(*) INTO completed_count
+    FROM user_media_preferences 
+    WHERE media_id = p_media_id AND status = 'completed';
+
+    result := jsonb_build_object(
+        'totalRevues', COALESCE(total_revues, 0),
+        'averageRating', COALESCE(avg_rating, 0),
+        'readingCount', COALESCE(reading_count, 0),
+        'wantToReadCount', COALESCE(want_to_read_count, 0),
+        'completedCount', COALESCE(completed_count, 0)
+    );
+
+    RETURN result;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to get recent reviews for a media item
+CREATE OR REPLACE FUNCTION public.get_media_recent_revues(
+    p_media_id TEXT, 
+    p_limit INTEGER DEFAULT 10,
+    p_offset INTEGER DEFAULT 0
+)
+RETURNS TABLE (
+    id UUID,
+    user_id UUID,
+    user_name TEXT,
+    user_username TEXT,
+    user_avatar TEXT,
+    content TEXT,
+    rating DECIMAL(3,1),
+    like_count INTEGER,
+    comment_count INTEGER,
+    created_at TIMESTAMP WITH TIME ZONE
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        p.id,
+        p.user_id,
+        COALESCE(up.display_name, up.username) as user_name,
+        up.username as user_username,
+        up.avatar_url as user_avatar,
+        p.content,
+        p.rating,
+        p.like_count,
+        p.comment_count,
+        p.created_at
+    FROM posts p
+    JOIN user_profiles up ON p.user_id = up.id
+    WHERE p.media_id = p_media_id 
+        AND p.is_public = TRUE
+        AND up.onboarding_completed = TRUE
+    ORDER BY p.created_at DESC
+    LIMIT p_limit OFFSET p_offset;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to get users who are reading a specific media
+CREATE OR REPLACE FUNCTION public.get_media_readers(
+    p_media_id TEXT,
+    p_limit INTEGER DEFAULT 20,
+    p_offset INTEGER DEFAULT 0
+)
+RETURNS TABLE (
+    user_id UUID,
+    user_name TEXT,
+    user_username TEXT,
+    user_avatar TEXT,
+    status TEXT,
+    started_reading TIMESTAMP WITH TIME ZONE
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        ump.user_id,
+        COALESCE(up.display_name, up.username) as user_name,
+        up.username as user_username,
+        up.avatar_url as user_avatar,
+        ump.status,
+        ump.created_at as started_reading
+    FROM user_media_preferences ump
+    JOIN user_profiles up ON ump.user_id = up.id
+    WHERE ump.media_id = p_media_id 
+        AND ump.status = 'reading'
+        AND up.onboarding_completed = TRUE
+    ORDER BY ump.created_at DESC
+    LIMIT p_limit OFFSET p_offset;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to get users who want to read a specific media
+CREATE OR REPLACE FUNCTION public.get_media_want_to_readers(
+    p_media_id TEXT,
+    p_limit INTEGER DEFAULT 20,
+    p_offset INTEGER DEFAULT 0
+)
+RETURNS TABLE (
+    user_id UUID,
+    user_name TEXT,
+    user_username TEXT,
+    user_avatar TEXT,
+    source TEXT, -- 'bookmark' or 'preference'
+    added_at TIMESTAMP WITH TIME ZONE
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT DISTINCT ON (combined.user_id)
+        combined.user_id,
+        combined.user_name,
+        combined.user_username,
+        combined.user_avatar,
+        combined.source,
+        combined.added_at
+    FROM (
+        -- From bookmarks
+        SELECT 
+            ub.user_id,
+            COALESCE(up.display_name, up.username) as user_name,
+            up.username as user_username,
+            up.avatar_url as user_avatar,
+            'bookmark'::TEXT as source,
+            ub.bookmarked_at as added_at
+        FROM user_bookmarks ub
+        JOIN user_profiles up ON ub.user_id = up.id
+        WHERE ub.media_id = p_media_id 
+            AND up.onboarding_completed = TRUE
+
+        UNION
+
+        -- From preferences with want_to_read status
+        SELECT 
+            ump.user_id,
+            COALESCE(up.display_name, up.username) as user_name,
+            up.username as user_username,
+            up.avatar_url as user_avatar,
+            'preference'::TEXT as source,
+            ump.created_at as added_at
+        FROM user_media_preferences ump
+        JOIN user_profiles up ON ump.user_id = up.id
+        WHERE ump.media_id = p_media_id 
+            AND ump.status = 'want_to_read'
+            AND up.onboarding_completed = TRUE
+    ) combined
+    ORDER BY combined.user_id, combined.added_at DESC
+    LIMIT p_limit OFFSET p_offset;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to get users who revued a specific media
+CREATE OR REPLACE FUNCTION public.get_media_revuers(
+    p_media_id TEXT,
+    p_limit INTEGER DEFAULT 20,
+    p_offset INTEGER DEFAULT 0
+)
+RETURNS TABLE (
+    user_id UUID,
+    user_name TEXT,
+    user_username TEXT,
+    user_avatar TEXT,
+    post_id UUID,
+    content_snippet TEXT,
+    rating DECIMAL(3,1),
+    revued_at TIMESTAMP WITH TIME ZONE
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        p.user_id,
+        COALESCE(up.display_name, up.username) as user_name,
+        up.username as user_username,
+        up.avatar_url as user_avatar,
+        p.id as post_id,
+        LEFT(p.content, 100) as content_snippet,
+        p.rating,
+        p.created_at as revued_at
+    FROM posts p
+    JOIN user_profiles up ON p.user_id = up.id
+    WHERE p.media_id = p_media_id 
+        AND p.is_public = TRUE
+        AND up.onboarding_completed = TRUE
+    ORDER BY p.created_at DESC
+    LIMIT p_limit OFFSET p_offset;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ============================================================================
+-- ROW LEVEL SECURITY FOR NEW TABLES
+-- ============================================================================
+
+-- Enable RLS
+ALTER TABLE media_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE posts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE post_likes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE post_comments ENABLE ROW LEVEL SECURITY;
+
+-- Media items policies (readable by all, manageable by system)
+CREATE POLICY "Anyone can view media items" ON media_items FOR SELECT USING (true);
+CREATE POLICY "System can manage media items" ON media_items FOR ALL USING (auth.role() = 'service_role');
+
+-- Posts policies
+CREATE POLICY "Users can view public posts" ON posts FOR SELECT USING (is_public = TRUE);
+CREATE POLICY "Users can view own posts" ON posts FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can manage own posts" ON posts FOR ALL USING (auth.uid() = user_id);
+
+-- Post likes policies
+CREATE POLICY "Users can view post likes" ON post_likes FOR SELECT USING (true);
+CREATE POLICY "Users can manage own likes" ON post_likes FOR ALL USING (auth.uid() = user_id);
+
+-- Post comments policies
+CREATE POLICY "Users can view comments on public posts" ON post_comments 
+    FOR SELECT USING (
+        post_id IN (SELECT id FROM posts WHERE is_public = TRUE)
+    );
+CREATE POLICY "Users can manage own comments" ON post_comments FOR ALL USING (auth.uid() = user_id); 

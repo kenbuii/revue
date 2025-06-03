@@ -160,7 +160,7 @@ export class AuthDebugger {
       
       // Prepare payload to match the ACTUAL database function signature
       const payload: any = {
-        target_user_id: userId,
+        p_user_id: userId,
         // Parameters that actually exist in the deployed Supabase function:
         p_avatar_url: onboardingData.profileImageUrl || null,
         p_contact_sync_enabled: onboardingData.contactsSynced || false,

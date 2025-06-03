@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,20 +6,38 @@ import {
   StyleSheet,
   TextInput,
   ScrollView,
+  Alert,
+  ActivityIndicator,
+  Image,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from 'react-native-safe-area-context';
 import KeyboardDismissWrapper from '@/components/KeyboardDismissWrapper';
+import { postService, CreatePostParams } from '@/lib/posts';
+import { useAuth } from '@/contexts/AuthContext';
+import { useUserProfile } from '@/contexts/UserProfileContext';
 
 export default function Step3() {
   const params = useLocalSearchParams();
   const router = useRouter();
+  const { isAuthenticated } = useAuth();
+  const { profile } = useUserProfile();
+  
   const [postTitle, setPostTitle] = useState("");
   const [thoughts, setThoughts] = useState("");
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [pageNumber, setPageNumber] = useState("");
   const [isEditingPage, setIsEditingPage] = useState(false);
+  const [rating, setRating] = useState<number>(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Debug logging for params
+  useEffect(() => {
+    if (__DEV__) {
+      console.log('📋 Step3 received params:', params);
+    }
+  }, [params]);
 
   const getLocationPlaceholder = () => {
     const type = params.type as string;
@@ -50,14 +68,144 @@ export default function Step3() {
     }
   };
 
-  const handlePost = () => {
-    // Handle post creation here
-    console.log("Creating post with:", {
-      params,
-      postTitle,
-      thoughts,
-      pageNumber,
-    });
+  const validateForm = () => {
+    if (!thoughts.trim()) {
+      Alert.alert('Missing Content', 'Please share your thoughts about this media.');
+      return false;
+    }
+    return true;
+  };
+
+  const handlePost = async () => {
+    if (!validateForm()) {
+      return;
+    }
+
+    if (!isAuthenticated) {
+      Alert.alert('Authentication Required', 'Please sign in to create a revue.');
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const createPostParams: CreatePostParams = {
+        // Media information
+        mediaId: params.mediaId as string,
+        mediaTitle: params.title as string,
+        mediaType: params.type as 'movie' | 'tv' | 'book',
+        mediaYear: params.year as string,
+        mediaGenre: params.genre as string,
+        mediaCreator: params.creator as string,
+        mediaCover: params.image as string,
+        
+        // Post content
+        title: postTitle.trim() || undefined,
+        content: thoughts.trim(),
+        rating: rating > 0 ? rating : undefined,
+        tags: [], // Could be extended later
+        
+        // Location context
+        location: pageNumber.trim() || undefined,
+      };
+
+      console.log('📝 Creating post with:', createPostParams);
+
+      const result = await postService.createPost(createPostParams);
+
+      if (result.success) {
+        Alert.alert(
+          'Success!',
+          'Your revue has been published successfully.',
+          [
+            {
+              text: 'View in Feed',
+              onPress: () => {
+                router.push('/(tabs)');
+              },
+            },
+            {
+              text: 'Back to Media',
+              onPress: () => {
+                router.back();
+              },
+            },
+          ],
+          { cancelable: false }
+        );
+      } else {
+        throw new Error(result.error || 'Failed to create post');
+      }
+    } catch (error) {
+      console.error('❌ Error creating post:', error);
+      Alert.alert(
+        'Error',
+        'Failed to publish your revue. Please try again.',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSaveDraft = async () => {
+    if (!thoughts.trim() && !postTitle.trim()) {
+      Alert.alert('Nothing to Save', 'Please write something before saving as draft.');
+      return;
+    }
+
+    try {
+      const draftParams: CreatePostParams = {
+        mediaTitle: params.title as string,
+        mediaType: params.type as 'movie' | 'tv' | 'book',
+        mediaYear: params.year as string,
+        mediaGenre: params.genre as string,
+        mediaCreator: params.creator as string,
+        title: postTitle.trim() || undefined,
+        content: thoughts.trim(),
+        rating: rating > 0 ? rating : undefined,
+        location: pageNumber.trim() || undefined,
+      };
+
+      await postService.saveDraftPost(draftParams);
+      
+      Alert.alert(
+        'Draft Saved',
+        'Your draft has been saved locally.',
+        [{ text: 'OK' }]
+      );
+    } catch (error) {
+      console.error('❌ Error saving draft:', error);
+      Alert.alert('Error', 'Failed to save draft.');
+    }
+  };
+
+  const StarRating = () => {
+    const stars = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+    
+    return (
+      <View style={styles.ratingContainer}>
+        <Text style={styles.ratingLabel}>Rating (optional):</Text>
+        <View style={styles.starsContainer}>
+          {stars.map((star) => (
+            <TouchableOpacity
+              key={star}
+              onPress={() => setRating(star)}
+              style={styles.starButton}
+            >
+              <Ionicons
+                name={star <= rating ? 'star' : 'star-outline'}
+                size={24}
+                color={star <= rating ? '#FFD700' : '#CCC'}
+              />
+            </TouchableOpacity>
+          ))}
+        </View>
+        {rating > 0 && (
+          <Text style={styles.ratingText}>{rating}/10</Text>
+        )}
+      </View>
+    );
   };
 
   return (
@@ -82,9 +230,13 @@ export default function Step3() {
           <View style={styles.mediaInfo}>
             <View style={styles.profileSection}>
               <View style={styles.avatar}>
-                <Ionicons name="person-circle" size={40} color="#2F4F4F" />
+                {profile?.avatar_url ? (
+                  <Image source={{ uri: profile.avatar_url }} style={styles.avatarImage} />
+                ) : (
+                  <Ionicons name="person-circle" size={40} color="#2F4F4F" />
+                )}
               </View>
-              <Text style={styles.username}>kristine</Text>
+              <Text style={styles.username}>{profile?.display_name || profile?.username || 'You'}</Text>
               <Text style={styles.revuingText}>is revuing</Text>
             </View>
 
@@ -119,7 +271,11 @@ export default function Step3() {
             </View>
 
             <View style={styles.mediaCover}>
-              <Ionicons name="image-outline" size={48} color="#2F4F4F" />
+              {params.image ? (
+                <Image source={{ uri: params.image as string }} style={styles.mediaCoverImage} />
+              ) : (
+                <Ionicons name="image-outline" size={48} color="#2F4F4F" />
+              )}
             </View>
           </View>
 
@@ -152,18 +308,24 @@ export default function Step3() {
             )}
           </View>
 
+          <StarRating />
+
           <Text style={styles.label}>thoughts:</Text>
           <TextInput
             style={styles.thoughtsInput}
-            placeholder="Type something"
+            placeholder="Share your thoughts about this media..."
             value={thoughts}
             onChangeText={setThoughts}
             multiline
             placeholderTextColor="#666"
+            textAlignVertical="top"
           />
 
           <Text style={styles.label}>optional picture:</Text>
-          <View style={styles.libraryButton}>
+          <TouchableOpacity 
+            style={styles.libraryButton}
+            onPress={() => Alert.alert('Coming Soon', 'Image upload feature will be available in a future update.')}
+          >
             <Text style={styles.libraryTitle}>Library</Text>
             <View style={styles.imageGrid}>
               {[1, 2, 3, 4, 5, 6].map((index) => (
@@ -172,11 +334,33 @@ export default function Step3() {
                 </View>
               ))}
             </View>
-          </View>
-
-          <TouchableOpacity style={styles.postButton} onPress={handlePost}>
-            <Text style={styles.postButtonText}>Post</Text>
           </TouchableOpacity>
+
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity 
+              style={styles.draftButton} 
+              onPress={handleSaveDraft}
+              disabled={isSubmitting}
+            >
+              <Ionicons name="bookmark-outline" size={16} color="#666" />
+              <Text style={styles.draftButtonText}>Save Draft</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[styles.postButton, isSubmitting && styles.postButtonDisabled]} 
+              onPress={handlePost}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <>
+                  <ActivityIndicator size="small" color="white" style={{ marginRight: 8 }} />
+                  <Text style={styles.postButtonText}>Publishing...</Text>
+                </>
+              ) : (
+                <Text style={styles.postButtonText}>Publish Revue</Text>
+              )}
+            </TouchableOpacity>
+          </View>
         </ScrollView>
       </KeyboardDismissWrapper>
     </SafeAreaView>
@@ -209,7 +393,7 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontStyle: "italic",
     textAlign: "center",
-    marginBottom: 40,
+    marginBottom: 20,
   },
   stepTitle: {
     fontSize: 24,
@@ -233,6 +417,13 @@ const styles = StyleSheet.create({
     marginBottom: 5,
     justifyContent: "center",
     alignItems: "center",
+    borderRadius: 20,
+    overflow: "hidden",
+  },
+  avatarImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
   },
   username: {
     fontSize: 14,
@@ -294,6 +485,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderRadius: 8,
     marginLeft: 15,
+    overflow: "hidden",
+  },
+  mediaCoverImage: {
+    width: 60,
+    height: 80,
+    borderRadius: 8,
   },
   postTitleContainer: {
     marginBottom: 20,
@@ -319,6 +516,28 @@ const styles = StyleSheet.create({
   },
   filledPostTitle: {
     color: "#2F4F4F",
+  },
+  ratingContainer: {
+    marginBottom: 20,
+  },
+  ratingLabel: {
+    fontSize: 18,
+    color: "#2F4F4F",
+    marginBottom: 10,
+  },
+  starsContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 5,
+  },
+  starButton: {
+    padding: 2,
+  },
+  ratingText: {
+    fontSize: 16,
+    color: "#2F4F4F",
+    marginTop: 10,
+    fontWeight: "500",
   },
   label: {
     fontSize: 18,
@@ -358,12 +577,39 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  buttonContainer: {
+    flexDirection: "row",
+    gap: 15,
+    marginTop: 20,
+  },
+  draftButton: {
+    flex: 1,
+    backgroundColor: "#F2EFE6",
+    padding: 15,
+    borderRadius: 8,
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#E8E4D8",
+  },
+  draftButtonText: {
+    color: "#666",
+    fontSize: 16,
+    fontWeight: "500",
+    marginLeft: 5,
+  },
   postButton: {
+    flex: 2,
     backgroundColor: "#2F4F4F",
     padding: 15,
     borderRadius: 8,
     alignItems: "center",
-    marginTop: 20,
+    flexDirection: "row",
+    justifyContent: "center",
+  },
+  postButtonDisabled: {
+    opacity: 0.7,
   },
   postButtonText: {
     color: "white",

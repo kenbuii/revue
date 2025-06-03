@@ -355,7 +355,7 @@ class AuthService {
 
       // Prepare data for Supabase function with parameters that ACTUALLY exist in the database
       const payload: any = {
-        target_user_id: userId,
+        p_user_id: userId,
         // Parameters that actually exist in the deployed Supabase function:
         p_avatar_url: data.profileImageUrl || null,
         p_contact_sync_enabled: data.contactsSynced || false,

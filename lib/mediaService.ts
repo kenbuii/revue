@@ -466,51 +466,128 @@ class MediaSearchService {
   }
 
   /**
-   * Get popular media items (static data for now)
+   * Get popular media items using real API data
+   * Fetches equal numbers of movies, TV shows, and books from trending APIs
    */
-  getPopularItems(): MediaItem[] {
+  async getPopularItems(): Promise<MediaItem[]> {
+    try {
+      console.log('🔥 Fetching popular items from real APIs...');
+      
+      // Get trending data from all sources
+      const trending = await this.getAllTrending();
+      
+      // Take equal numbers from each category (3 of each = 9 total)
+      const moviesSlice = trending.movies.slice(0, 3);
+      const tvSlice = trending.tv.slice(0, 3);
+      const booksSlice = trending.books.slice(0, 3);
+      
+      // Combine and shuffle for variety
+      const combined = [...moviesSlice, ...tvSlice, ...booksSlice];
+      
+      // Shuffle array to mix types
+      for (let i = combined.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [combined[i], combined[j]] = [combined[j], combined[i]];
+      }
+      
+      console.log(`✅ Popular items fetched: ${moviesSlice.length} movies, ${tvSlice.length} TV shows, ${booksSlice.length} books`);
+      
+      return combined;
+      
+    } catch (error) {
+      console.error('❌ Error fetching popular items, falling back to static data:', error);
+      return this.getFallbackPopularItems();
+    }
+  }
+
+  /**
+   * Fallback popular items when APIs are unavailable
+   */
+  private getFallbackPopularItems(): MediaItem[] {
     return [
       {
-        id: 'popular_1',
-        title: 'Harry Potter',
-        type: 'book',
-        source: 'popular',
-        description: 'Popular fantasy book series',
-      },
-      {
-        id: 'popular_2',
-        title: 'Never Let Me Go',
-        type: 'book',
-        source: 'popular',
-        description: 'Popular dystopian novel',
-      },
-      {
-        id: 'popular_3',
-        title: 'Pride & Prejudice',
+        id: 'popular_movie_1',
+        title: 'Oppenheimer',
         type: 'movie',
-        source: 'popular',
-        description: 'Classic romantic drama',
+        year: '2023',
+        source: 'tmdb',
+        description: 'The story of J. Robert Oppenheimer and the Manhattan Project',
+        rating: 8.3,
       },
       {
-        id: 'popular_4',
-        title: 'The Office',
+        id: 'popular_tv_1',
+        title: 'House of the Dragon',
         type: 'tv',
-        source: 'popular',
-        description: 'Popular comedy series',
+        year: '2022',
+        source: 'tmdb',
+        description: 'The Targaryen civil war, set 200 years before Game of Thrones',
+        rating: 8.4,
       },
       {
-        id: 'popular_5',
-        title: 'Inception',
+        id: 'popular_book_1',
+        title: 'Fourth Wing',
+        type: 'book',
+        year: '2023',
+        source: 'google_books',
+        description: 'A deadly war college where dragons choose their riders',
+        author: 'Rebecca Yarros',
+        rating: 4.5,
+      },
+      {
+        id: 'popular_movie_2',
+        title: 'Barbie',
         type: 'movie',
-        source: 'popular',
-        description: 'Mind-bending thriller',
+        year: '2023',
+        source: 'tmdb',
+        description: 'A doll living in Barbieland gets expelled for being imperfect',
+        rating: 7.2,
       },
       {
-        id: 'popular_6',
-        title: 'Breaking Bad',
+        id: 'popular_tv_2',
+        title: 'The Last of Us',
         type: 'tv',
-        source: 'popular',
-        description: 'Acclaimed drama series',
+        year: '2023',
+        source: 'tmdb',
+        description: 'Joel and Ellie navigate a post-apocalyptic world',
+        rating: 8.8,
+      },
+      {
+        id: 'popular_book_2',
+        title: 'Tomorrow, and Tomorrow, and Tomorrow',
+        type: 'book',
+        year: '2022',
+        source: 'google_books',
+        description: 'A novel about friendship and video game design',
+        author: 'Gabrielle Zevin',
+        rating: 4.3,
+      },
+      {
+        id: 'popular_movie_3',
+        title: 'Spider-Man: Across the Spider-Verse',
+        type: 'movie',
+        year: '2023',
+        source: 'tmdb',
+        description: 'Miles Morales catapults across the Multiverse',
+        rating: 8.7,
+      },
+      {
+        id: 'popular_tv_3',
+        title: 'Wednesday',
+        type: 'tv',
+        year: '2022',
+        source: 'tmdb',
+        description: 'Wednesday Addams at Nevermore Academy',
+        rating: 8.1,
+      },
+      {
+        id: 'popular_book_3',
+        title: 'The Seven Moons of Maali Almeida',
+        type: 'book',
+        year: '2022',
+        source: 'google_books',
+        description: 'A magical realist novel set in Sri Lanka',
+        author: 'Shehan Karunatilaka',
+        rating: 4.1,
       },
     ];
   }

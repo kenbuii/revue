@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { userProfileService, UserProfile, UserStats, MediaPreference, UserReview } from '@/lib/userProfile';
+import { likedPostsService, LikedPost } from '@/lib/likedPostsService';
 import { useAuth } from './AuthContext';
 
 interface UserProfileContextType {
@@ -8,18 +9,21 @@ interface UserProfileContextType {
   stats: UserStats;
   mediaPreferences: MediaPreference[];
   recentReviews: UserReview[];
+  likedPosts: LikedPost[];
   
   // Loading states
   loadingProfile: boolean;
   loadingStats: boolean;
   loadingMedia: boolean;
   loadingReviews: boolean;
+  loadingLikedPosts: boolean;
   
   // Actions
   refreshProfile: () => Promise<void>;
   refreshStats: () => Promise<void>;
   refreshMediaPreferences: () => Promise<void>;
   refreshRecentReviews: () => Promise<void>;
+  refreshLikedPosts: () => Promise<void>;
   refreshAll: () => Promise<void>;
   updateProfile: (updates: Partial<UserProfile>) => Promise<{ success: boolean; error?: string }>;
   uploadProfilePicture: (file: Blob) => Promise<{ success: boolean; url?: string; error?: string }>;
@@ -28,11 +32,16 @@ interface UserProfileContextType {
   removeMediaPreference: (mediaId: string) => Promise<{ success: boolean; error?: string }>;
   updateMediaPreferencesOrder: (orderedPreferences: MediaPreference[]) => Promise<{ success: boolean; error?: string }>;
   
+  // Liked posts management
+  likePost: (postId: string) => Promise<{ success: boolean; error?: string }>;
+  unlikePost: (postId: string) => Promise<{ success: boolean; error?: string }>;
+  
   // Error states
   profileError: string | null;
   statsError: string | null;
   mediaError: string | null;
   reviewsError: string | null;
+  likedPostsError: string | null;
 }
 
 const UserProfileContext = createContext<UserProfileContextType | undefined>(undefined);
@@ -49,18 +58,21 @@ export function UserProfileProvider({ children }: UserProfileProviderProps) {
   const [stats, setStats] = useState<UserStats>({ reviewCount: 0, followers: 0, following: 0 });
   const [mediaPreferences, setMediaPreferences] = useState<MediaPreference[]>([]);
   const [recentReviews, setRecentReviews] = useState<UserReview[]>([]);
+  const [likedPosts, setLikedPosts] = useState<LikedPost[]>([]);
   
   // Loading states
   const [loadingProfile, setLoadingProfile] = useState(false);
   const [loadingStats, setLoadingStats] = useState(false);
   const [loadingMedia, setLoadingMedia] = useState(false);
   const [loadingReviews, setLoadingReviews] = useState(false);
+  const [loadingLikedPosts, setLoadingLikedPosts] = useState(false);
   
   // Error states
   const [profileError, setProfileError] = useState<string | null>(null);
   const [statsError, setStatsError] = useState<string | null>(null);
   const [mediaError, setMediaError] = useState<string | null>(null);
   const [reviewsError, setReviewsError] = useState<string | null>(null);
+  const [likedPostsError, setLikedPostsError] = useState<string | null>(null);
 
   // Refresh functions
   const refreshProfile = async () => {
@@ -160,6 +172,29 @@ export function UserProfileProvider({ children }: UserProfileProviderProps) {
     }
   };
 
+  const refreshLikedPosts = async () => {
+    if (!isAuthenticated || !user) {
+      setLikedPosts([]);
+      setLikedPostsError(null);
+      return;
+    }
+
+    setLoadingLikedPosts(true);
+    setLikedPostsError(null);
+    
+    try {
+      console.log('🔄 Refreshing liked posts...');
+      const likedPostsData = await likedPostsService.getUserLikedPosts();
+      setLikedPosts(likedPostsData);
+      console.log('✅ Liked posts refreshed successfully');
+    } catch (error) {
+      console.error('❌ Error refreshing liked posts:', error);
+      setLikedPostsError(error instanceof Error ? error.message : 'Failed to load liked posts');
+    } finally {
+      setLoadingLikedPosts(false);
+    }
+  };
+
   const refreshAll = async () => {
     console.log('🔄 Refreshing all profile data...');
     await Promise.all([
@@ -167,6 +202,7 @@ export function UserProfileProvider({ children }: UserProfileProviderProps) {
       refreshStats(),
       refreshMediaPreferences(),
       refreshRecentReviews(),
+      refreshLikedPosts(),
     ]);
     console.log('✅ All profile data refreshed');
   };
@@ -258,6 +294,49 @@ export function UserProfileProvider({ children }: UserProfileProviderProps) {
     }
   };
 
+  // Liked posts functions
+  const likePost = async (postId: string) => {
+    try {
+      console.log('🔄 Liking post...', postId);
+      const result = await likedPostsService.likePost(postId);
+      
+      if (result.success) {
+        // Refresh liked posts to get updated list
+        await refreshLikedPosts();
+        console.log('✅ Post liked successfully');
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('❌ Error liking post:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      };
+    }
+  };
+
+  const unlikePost = async (postId: string) => {
+    try {
+      console.log('🔄 Unliking post...', postId);
+      const result = await likedPostsService.unlikePost(postId);
+      
+      if (result.success) {
+        // Refresh liked posts to get updated list
+        await refreshLikedPosts();
+        console.log('✅ Post unliked successfully');
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('❌ Error unliking post:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      };
+    }
+  };
+
   // Effect to load data when authentication changes
   useEffect(() => {
     if (isAuthenticated && user) {
@@ -270,10 +349,12 @@ export function UserProfileProvider({ children }: UserProfileProviderProps) {
       setStats({ reviewCount: 0, followers: 0, following: 0 });
       setMediaPreferences([]);
       setRecentReviews([]);
+      setLikedPosts([]);
       setProfileError(null);
       setStatsError(null);
       setMediaError(null);
       setReviewsError(null);
+      setLikedPostsError(null);
     }
   }, [isAuthenticated, user]);
 
@@ -283,18 +364,21 @@ export function UserProfileProvider({ children }: UserProfileProviderProps) {
     stats,
     mediaPreferences,
     recentReviews,
+    likedPosts,
     
     // Loading states
     loadingProfile,
     loadingStats,
     loadingMedia,
     loadingReviews,
+    loadingLikedPosts,
     
     // Actions
     refreshProfile,
     refreshStats,
     refreshMediaPreferences,
     refreshRecentReviews,
+    refreshLikedPosts,
     refreshAll,
     updateProfile,
     uploadProfilePicture,
@@ -303,11 +387,16 @@ export function UserProfileProvider({ children }: UserProfileProviderProps) {
     removeMediaPreference,
     updateMediaPreferencesOrder,
     
+    // Liked posts management
+    likePost,
+    unlikePost,
+    
     // Error states
     profileError,
     statsError,
     mediaError,
     reviewsError,
+    likedPostsError,
   };
 
   return (

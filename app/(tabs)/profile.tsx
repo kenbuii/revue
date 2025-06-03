@@ -1,21 +1,17 @@
 import React from 'react';
 import { StyleSheet, Text, View, Image, ScrollView, TouchableOpacity, FlatList, ActivityIndicator, Alert, RefreshControl } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Feather, AntDesign, Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AppHeader from '@/components/AppHeader';
 import { router } from 'expo-router';
 import { useBookmarks } from '@/contexts/BookmarksContext';
 import { useUserProfile } from '@/contexts/UserProfileContext';
 import { useAuth } from '@/contexts/AuthContext';
-import DraggableMediaList from '@/components/DraggableMediaList';
+import HorizontalDragDropCarousel from '@/components/HorizontalDragDropCarousel';
+import { MediaPreference } from '@/lib/userProfile';
+import ProfileEditForm from '@/components/ProfileEditForm';
 
-// Mock data for sections that don't have backend yet
-const favoriteVues = [
-  { id: '1', title: 'Fantastic Mr. Fox', cover: 'https://m.media-amazon.com/images/M/MV5BOGUwYTU4NGEtNDM4MS00NDRjLTkwNmQtOTkwMWMyMjhmMjdlXkEyXkFqcGdeQXVyMTMxODk2OTU@._V1_FMjpg_UX1000_.jpg', comment: 'wes anderson hater but this one is forever going to be one of my favori...' },
-  { id: '2', title: 'The Count of Monte Cristo', cover: 'https://m.media-amazon.com/images/I/51uLvJlKpNL.jpg', comment: 'wes anderson hater but this one is forever going to be one of my favori...' },
-  { id: '3', title: 'Never Let Me Go', cover: 'https://m.media-amazon.com/images/I/71kwkajubgL._AC_UF1000,1000_QL80_.jpg', comment: 'wes anderson hater but this one is forever going to be one of my favori...' },
-];
-
+// Remove mock data - now using real data from context
 const recentRevues = [
   { 
     id: '1', 
@@ -41,9 +37,11 @@ export default function ProfileScreen() {
     stats, 
     mediaPreferences, 
     recentReviews: userRecentReviews,
+    likedPosts,
     loadingProfile, 
     loadingStats, 
     loadingMedia,
+    loadingLikedPosts,
     profileError,
     refreshAll,
     removeMediaPreference,
@@ -54,7 +52,7 @@ export default function ProfileScreen() {
   const { removeBookmark } = useBookmarks();
   const [refreshing, setRefreshing] = React.useState(false);
   
-  const handleRemoveBookmark = (postId: string, title: string) => {
+  const handleRemoveBookmark = async (postId: string, title: string) => {
     Alert.alert(
       'Remove Bookmark',
       `Remove "${title}" from your bookmarks?`,
@@ -66,15 +64,20 @@ export default function ProfileScreen() {
         {
           text: 'Remove',
           style: 'destructive',
-          onPress: () => {
-            removeBookmark(postId);
-            // Optional: Add success feedback
-            Alert.alert(
-              'Bookmark Removed',
-              'The bookmark has been removed successfully.',
-              [{ text: 'OK' }],
-              { cancelable: true }
-            );
+          onPress: async () => {
+            try {
+              await removeBookmark(postId);
+              // Optional: Add success feedback
+              Alert.alert(
+                'Bookmark Removed',
+                'The bookmark has been removed successfully.',
+                [{ text: 'OK' }],
+                { cancelable: true }
+              );
+            } catch (error) {
+              console.error('Error removing bookmark:', error);
+              Alert.alert('Error', 'Failed to remove bookmark. Please try again.');
+            }
           },
         },
       ]
@@ -286,7 +289,7 @@ export default function ProfileScreen() {
           </View>
         )}
 
-        {/* On Vue Section - Now with drag-and-drop and remove functionality */}
+        {/* On Vue Section - Now with enhanced navigation and drag-and-drop */}
         <View style={styles.sectionContainer}>
           <Text style={styles.sectionTitle}>ON VUE</Text>
           {loadingMedia ? (
@@ -295,37 +298,91 @@ export default function ProfileScreen() {
               <Text style={styles.loadingSectionText}>Loading your media...</Text>
             </View>
           ) : (
-            <DraggableMediaList
-              mediaPreferences={mediaPreferences}
+            <HorizontalDragDropCarousel<MediaPreference>
+              items={mediaPreferences}
               onRemove={removeMediaPreference}
               onReorder={updateMediaPreferencesOrder}
+              getItemId={(item: MediaPreference) => item.media_id}
+              getItemTitle={(item: MediaPreference) => item.title}
+              renderItem={(item: MediaPreference, isActive: boolean) => (
+                <TouchableOpacity 
+                  style={styles.mediaCard}
+                  onPress={() => router.push({
+                    pathname: '/media/[id]' as const,
+                    params: {
+                      id: item.media_id,
+                      title: item.title,
+                      type: item.media_type,
+                      year: item.year || '',
+                      image: item.image_url || '',
+                      description: item.description || '',
+                    },
+                  })}
+                  disabled={isActive}
+                >
+                  <Image 
+                    source={{ uri: item.image_url || 'https://via.placeholder.com/130x180' }} 
+                    style={styles.mediaCover} 
+                  />
+                  <Text style={styles.mediaAuthor} numberOfLines={2}>{item.title}</Text>
+                </TouchableOpacity>
+              )}
+              emptyStateMessage="No media preferences found"
+              emptyStateSubtext="Add some favorites during onboarding or in your settings"
+              removeConfirmTitle="Remove from On Vue"
+              removeConfirmMessage="Remove &quot;{title}&quot; from your On Vue list?"
+              removeSuccessMessage="&quot;{title}&quot; has been removed from your On Vue list."
               loading={loadingMedia}
             />
           )}
         </View>
 
-        {/* Favorite Vues Section - Using mock data for now */}
+        {/* Favorite Vues Section - Now using real data */}
         <View style={styles.sectionContainer}>
           <Text style={styles.sectionTitle}>FAVORITE VUES</Text>
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.horizontalScrollContent}
-          >
-            {favoriteVues.map(item => (
-              <TouchableOpacity 
-                key={item.id} 
-                style={styles.favoriteCard}
-                onPress={() => router.push('/media/1')}
-              >
-                <Image source={{ uri: item.cover }} style={styles.mediaCover} />
-                <Text style={styles.mediaAuthor}>{item.title}</Text>
-                <View style={styles.favoriteTextContainer}>
-                  <Text style={styles.favoriteComment}>{item.comment}</Text>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+          {loadingLikedPosts ? (
+            <View style={styles.loadingSection}>
+              <ActivityIndicator size="small" color="#004D00" />
+              <Text style={styles.loadingSectionText}>Loading your favorites...</Text>
+            </View>
+          ) : likedPosts.length > 0 ? (
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.horizontalScrollContent}
+            >
+              {likedPosts.map(item => (
+                <TouchableOpacity 
+                  key={item.id} 
+                  style={styles.favoriteCard}
+                  onPress={() => router.push({
+                    pathname: '/media/[id]' as const,
+                    params: {
+                      id: item.media.id,
+                      title: item.media.title,
+                      type: item.media.type,
+                      year: '',
+                      image: item.media.cover,
+                      description: '',
+                    },
+                  })}
+                >
+                  <Image source={{ uri: item.cover }} style={styles.mediaCover} />
+                  <Text style={styles.mediaAuthor}>{item.title}</Text>
+                  <View style={styles.favoriteTextContainer}>
+                    <Text style={styles.favoriteComment}>{item.comment}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          ) : (
+            <View style={styles.emptySection}>
+              <Text style={styles.emptySectionText}>No favorites yet</Text>
+              <Text style={styles.emptySectionSubtext}>
+                Favorite a revue to see your saved ones!
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Recent Revues - Using mock data for now, will use userRecentReviews when posts table is ready */}

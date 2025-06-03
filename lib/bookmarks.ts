@@ -88,6 +88,24 @@ class BookmarkService {
 
   // Convert Post to bookmark data for Supabase
   private postToBookmarkData(post: Post) {
+    // Helper function to safely convert date
+    const safeDate = (dateString: string): string | null => {
+      if (!dateString) return null;
+      
+      try {
+        const date = new Date(dateString);
+        // Check if date is valid
+        if (isNaN(date.getTime())) {
+          console.warn('Invalid date string:', dateString);
+          return new Date().toISOString(); // Use current date as fallback
+        }
+        return date.toISOString();
+      } catch (error) {
+        console.warn('Error parsing date:', dateString, error);
+        return new Date().toISOString(); // Use current date as fallback
+      }
+    };
+
     return {
       p_post_id: post.id,
       p_media_id: post.media.id,
@@ -98,7 +116,7 @@ class BookmarkService {
       p_post_content: post.content,
       p_post_author_name: post.user.name,
       p_post_author_avatar: post.user.avatar,
-      p_post_date: post.date ? new Date(post.date).toISOString() : null,
+      p_post_date: safeDate(post.date),
     };
   }
 
@@ -116,7 +134,7 @@ class BookmarkService {
       console.log('🔖 Fetching user bookmarks for:', targetUserId);
 
       const bookmarks = await this.callRPC('get_user_bookmarks', {
-        target_user_id: targetUserId
+        p_user_id: targetUserId
       });
 
       const posts = bookmarks.map((bookmark: Bookmark) => this.bookmarkToPost(bookmark));
@@ -144,7 +162,7 @@ class BookmarkService {
       const bookmarkData = this.postToBookmarkData(post);
       
       await this.callRPC('add_bookmark', {
-        target_user_id: userId,
+        p_user_id: userId,
         ...bookmarkData
       });
 
@@ -172,7 +190,7 @@ class BookmarkService {
       console.log('🔖 Removing bookmark for post:', postId);
 
       await this.callRPC('remove_bookmark', {
-        target_user_id: userId,
+        p_user_id: userId,
         p_post_id: postId
       });
 

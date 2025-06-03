@@ -1,6 +1,7 @@
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useEffect } from 'react';
 
 type MediaType = {
   id: string;
@@ -10,11 +11,24 @@ type MediaType = {
 
 export default function Step1() {
   const router = useRouter();
+  const params = useLocalSearchParams();
+  
   const mediaTypes: MediaType[] = [
     { id: 'book', icon: 'book-outline', label: 'book' },
     { id: 'movie', icon: 'film-outline', label: 'movie' },
     { id: 'tv', icon: 'tv-outline', label: 'TV show' },
   ];
+
+  // If we have pre-populated data from media detail page, skip directly to step 3
+  useEffect(() => {
+    if (params.title && params.type && params.creator) {
+      console.log('📋 Pre-filled data detected, skipping to step 3');
+      router.replace({
+        pathname: '/(post_flow)/step3',
+        params: params,
+      });
+    }
+  }, [params]);
 
   const handleMediaSelect = (type: string) => {
     router.push({

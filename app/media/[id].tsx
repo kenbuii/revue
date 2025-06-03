@@ -9,17 +9,23 @@ import {
   Alert,
   Share,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AppHeader from '@/components/AppHeader';
 import { useBookmarks } from '@/contexts/BookmarksContext';
+import { communityRevuesService, MediaCommunityStats } from '@/lib/communityRevuesService';
 
 export default function MediaDetailScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const { isBookmarked: isPostBookmarked, toggleBookmark } = useBookmarks();
+
+  // Community data state
+  const [communityData, setCommunityData] = useState<MediaCommunityStats | null>(null);
+  const [loadingCommunity, setLoadingCommunity] = useState(true);
 
   // Parse media data from URL params with safe defaults
   const mediaData = {
@@ -31,6 +37,35 @@ export default function MediaDetailScreen() {
     description: (params.description as string) || '',
     rating: params.rating ? parseFloat(params.rating as string) : undefined,
     author: (params.author as string) || '',
+  };
+
+  // Load community data on mount
+  useEffect(() => {
+    if (mediaData.id && mediaData.id !== 'unknown') {
+      loadCommunityData();
+    } else {
+      setLoadingCommunity(false);
+    }
+  }, [mediaData.id]);
+
+  const loadCommunityData = async () => {
+    try {
+      setLoadingCommunity(true);
+      const data = await communityRevuesService.getMediaCommunityData(mediaData.id);
+      setCommunityData(data);
+    } catch (error) {
+      console.error('Error loading community data:', error);
+      // Set empty data on error to prevent rendering issues
+      setCommunityData({
+        totalRevues: 0,
+        averageRating: 0,
+        readingCount: 0,
+        wantToReadCount: 0,
+        recentRevues: [],
+      });
+    } finally {
+      setLoadingCommunity(false);
+    }
   };
 
   // Debug logging to help diagnose parameter issues
@@ -95,6 +130,90 @@ export default function MediaDetailScreen() {
       return 'Media';
     }
     return type.charAt(0).toUpperCase() + type.slice(1);
+  };
+
+  // Safe rendering helper to prevent text errors
+  const renderCommunityStats = () => {
+    if (loadingCommunity) {
+      return (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="small" color="#004D00" />
+          <Text style={styles.loadingText}>Loading community stats...</Text>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.statsContainer}>
+        <TouchableOpacity 
+          style={styles.statItem}
+          onPress={() => {
+            if ((communityData?.totalRevues ?? 0) > 0) {
+              router.push({
+                pathname: '/media/[id]/community/revuers',
+                params: { 
+                  id: mediaData.id,
+                  title: mediaData.title
+                }
+              });
+            }
+          }}
+        >
+          <Text style={styles.statNumber}>{(communityData?.totalRevues ?? 0).toString()}</Text>
+          <Text style={styles.statLabel}>Revues</Text>
+        </TouchableOpacity>
+        
+        <View style={styles.statDivider} />
+        
+        <TouchableOpacity 
+          style={styles.statItem}
+          onPress={() => {
+            if ((communityData?.readingCount ?? 0) > 0) {
+              router.push({
+                pathname: '/media/[id]/community/readers',
+                params: { 
+                  id: mediaData.id,
+                  title: mediaData.title
+                }
+              });
+            }
+          }}
+        >
+          <Text style={styles.statNumber}>{(communityData?.readingCount ?? 0).toString()}</Text>
+          <Text style={styles.statLabel}>Reading</Text>
+        </TouchableOpacity>
+        
+        <View style={styles.statDivider} />
+        
+        <TouchableOpacity 
+          style={styles.statItem}
+          onPress={() => {
+            if ((communityData?.wantToReadCount ?? 0) > 0) {
+              router.push({
+                pathname: '/media/[id]/community/want-to-read',
+                params: { 
+                  id: mediaData.id,
+                  title: mediaData.title
+                }
+              });
+            }
+          }}
+        >
+          <Text style={styles.statNumber}>{(communityData?.wantToReadCount ?? 0).toString()}</Text>
+          <Text style={styles.statLabel}>Want to Read</Text>
+        </TouchableOpacity>
+        
+        {communityData?.averageRating && communityData.averageRating > 0 && (
+          <>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text style={styles.statNumber}>{communityData.averageRating.toFixed(1)}</Text>
+              <Text style={styles.statLabel}>Avg Rating</Text>
+            </View>
+          </>
+        )}
+      </View>
+    );
   };
 
   const handleBookmark = async () => {
@@ -238,37 +357,69 @@ export default function MediaDetailScreen() {
         {/* Stats Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Community Stats</Text>
-          <View style={styles.statsContainer}>
-            <View style={styles.statItem}>
-              <Text style={styles.statNumber}>0</Text>
-              <Text style={styles.statLabel}>Revues</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}>
-              <Text style={styles.statNumber}>0</Text>
-              <Text style={styles.statLabel}>Reading</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}>
-              <Text style={styles.statNumber}>0</Text>
-              <Text style={styles.statLabel}>Want to Read</Text>
-            </View>
-          </View>
+          {renderCommunityStats()}
         </View>
 
-        {/* Related Posts Section */}
+        {/* Community Revues Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Community Revues</Text>
-          <View style={styles.emptyState}>
-            <Ionicons name="chatbubbles-outline" size={48} color="#E0E0E0" />
-            <Text style={styles.emptyStateTitle}>No revues yet</Text>
-            <Text style={styles.emptyStateSubtitle}>
-              Be the first to share your thoughts about "{mediaData.title}"
-            </Text>
-            <TouchableOpacity style={styles.createFirstButton} onPress={handleCreatePost}>
-              <Text style={styles.createFirstButtonText}>Write First Revue</Text>
-            </TouchableOpacity>
-          </View>
+          {loadingCommunity ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="small" color="#004D00" />
+              <Text style={styles.loadingText}>Loading revues...</Text>
+            </View>
+          ) : communityData?.recentRevues && communityData.recentRevues.length > 0 ? (
+            <View style={styles.revuesContainer}>
+              {communityData.recentRevues.map((revue) => (
+                <View key={revue.id} style={styles.revueCard}>
+                  <View style={styles.revueHeader}>
+                    <Image 
+                      source={{ uri: revue.user.avatar || 'https://via.placeholder.com/40' }} 
+                      style={styles.userAvatar}
+                    />
+                    <View style={styles.revueUserInfo}>
+                      <Text style={styles.revueUserName}>{revue.user.name || 'Anonymous'}</Text>
+                      <Text style={styles.revueDate}>
+                        {revue.createdAt ? new Date(revue.createdAt).toLocaleDateString() : 'Unknown date'}
+                      </Text>
+                    </View>
+                    {revue.rating && typeof revue.rating === 'number' && revue.rating > 0 && (
+                      <View style={styles.revueRating}>
+                        <Ionicons name="star" size={12} color="#FFD700" />
+                        <Text style={styles.revueRatingText}>{revue.rating.toFixed(1)}</Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={styles.revueContent} numberOfLines={3}>
+                    {revue.content || 'No content available'}
+                  </Text>
+                  <View style={styles.revueFooter}>
+                    <View style={styles.revueStats}>
+                      <Ionicons name="heart-outline" size={14} color="#999" />
+                      <Text style={styles.revueStatText}>{revue.likeCount || 0}</Text>
+                      <Ionicons name="chatbubble-outline" size={14} color="#999" style={{ marginLeft: 12 }} />
+                      <Text style={styles.revueStatText}>{revue.commentCount || 0}</Text>
+                    </View>
+                  </View>
+                </View>
+              ))}
+              <TouchableOpacity style={styles.viewAllButton}>
+                <Text style={styles.viewAllButtonText}>View All Revues</Text>
+                <Ionicons name="chevron-forward" size={16} color="#004D00" />
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={styles.emptyState}>
+              <Ionicons name="chatbubbles-outline" size={48} color="#E0E0E0" />
+              <Text style={styles.emptyStateTitle}>No revues yet</Text>
+              <Text style={styles.emptyStateSubtitle}>
+                Be the first to share your thoughts about "{mediaData.title}"
+              </Text>
+              <TouchableOpacity style={styles.createFirstButton} onPress={handleCreatePost}>
+                <Text style={styles.createFirstButtonText}>Write First Revue</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
 
         {/* Bottom Spacing */}
@@ -505,5 +656,95 @@ const styles = StyleSheet.create({
   },
   bottomSpacing: {
     height: 30,
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  loadingText: {
+    color: '#666',
+    fontSize: 14,
+    fontWeight: '500',
+    marginLeft: 10,
+  },
+  revuesContainer: {
+    padding: 20,
+  },
+  revueCard: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+  },
+  revueHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  userAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 12,
+  },
+  revueUserInfo: {
+    flex: 1,
+  },
+  revueUserName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1a1a1a',
+  },
+  revueDate: {
+    fontSize: 14,
+    color: '#666',
+    fontWeight: '500',
+  },
+  revueRating: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 'auto',
+  },
+  revueRatingText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFD700',
+    marginLeft: 4,
+  },
+  revueContent: {
+    fontSize: 15,
+    color: '#555',
+  },
+  revueFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  revueStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  revueStatText: {
+    fontSize: 14,
+    color: '#999',
+    marginLeft: 4,
+  },
+  viewAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 12,
+    marginTop: 16,
+  },
+  viewAllButtonText: {
+    color: '#004D00',
+    fontSize: 14,
+    fontWeight: '600',
+    marginRight: 4,
   },
 });

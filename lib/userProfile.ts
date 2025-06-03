@@ -47,28 +47,59 @@ class UserProfileService {
   private supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
   /**
-   * Make authenticated HTTP request to Supabase
+   * Make authenticated request to Supabase REST API
    */
   private async makeSupabaseRequest(endpoint: string, options: RequestInit = {}) {
+    if (!this.supabaseUrl || !this.supabaseAnonKey) {
+      throw new Error('Supabase configuration missing');
+    }
+
     const session = await supabaseAuth.getSession();
     const token = session.data.session?.access_token || this.supabaseAnonKey;
 
-    const response = await fetch(`${this.supabaseUrl}/rest/v1/${endpoint}`, {
-      ...options,
+    const url = `${this.supabaseUrl}/rest/v1/${endpoint}`;
+    const requestOptions = {
+      method: 'GET',
       headers: {
-        'apikey': this.supabaseAnonKey!,
+        'apikey': this.supabaseAnonKey,
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
+        'Prefer': 'return=representation', // This ensures we get a response body
         ...options.headers,
       },
-    });
+      ...options,
+    };
+
+    console.log(`🔗 Making Supabase request: ${requestOptions.method} ${url}`);
+    
+    const response = await fetch(url, requestOptions);
 
     if (!response.ok) {
       const error = await response.text();
+      console.error(`❌ Supabase request failed: ${response.status} - ${error}`);
       throw new Error(`Supabase request failed: ${response.status} - ${error}`);
     }
 
-    return response.json();
+    // Handle empty responses (like DELETE operations)
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      console.log('✅ Non-JSON response (likely empty) - operation successful');
+      return null; // Return null for successful operations without JSON content
+    }
+
+    const responseText = await response.text();
+    if (!responseText.trim()) {
+      console.log('✅ Empty response - operation successful');
+      return null; // Return null for empty but successful responses
+    }
+
+    try {
+      return JSON.parse(responseText);
+    } catch (parseError) {
+      console.error('❌ JSON parse error:', parseError);
+      console.error('❌ Response text:', responseText);
+      throw new Error(`Failed to parse response as JSON: ${responseText}`);
+    }
   }
 
   /**
@@ -144,7 +175,7 @@ class UserProfileService {
       console.log('🔄 Fetching user media preferences for:', targetUserId);
 
       const preferences = await this.callRPC('get_user_media_preferences', {
-        target_user_id: targetUserId
+        p_user_id: targetUserId
       });
 
       console.log('✅ User media preferences fetched:', preferences.length, 'items');
@@ -349,20 +380,33 @@ class UserProfileService {
         return { success: false, error: 'No authenticated user found' };
       }
 
-      console.log('🔄 Updating media preferences order:', orderedPreferences.length, 'items');
+      console.log('🔄 Updating media preferences order:', {
+        userId,
+        itemCount: orderedPreferences.length,
+        items: orderedPreferences.map(p => ({ id: p.media_id, title: p.title }))
+      });
 
       // Since we don't have an explicit order column, we'll delete all and re-insert
       // in the new order (created_at will reflect the new order)
       
-      // Step 1: Delete all existing media preferences for this user
-      await this.makeSupabaseRequest(
-        `user_media_preferences?user_id=eq.${userId}&added_during_onboarding=eq.true`,
-        {
-          method: 'DELETE'
-        }
-      );
+      try {
+        // Step 1: Delete all existing media preferences for this user
+        console.log('🗑️ Deleting existing media preferences...');
+        const deleteResult = await this.makeSupabaseRequest(
+          `user_media_preferences?user_id=eq.${userId}&added_during_onboarding=eq.true`,
+          {
+            method: 'DELETE'
+          }
+        );
+        console.log('✅ Existing preferences deleted successfully');
+      } catch (deleteError) {
+        console.error('❌ Error deleting existing preferences:', deleteError);
+        throw new Error(`Failed to delete existing preferences: ${deleteError}`);
+      }
 
       // Step 2: Re-insert in the new order with slight time delays to ensure ordering
+      console.log('📝 Re-inserting preferences in new order...');
+      
       for (let i = 0; i < orderedPreferences.length; i++) {
         const preference = orderedPreferences[i];
         const now = new Date();
@@ -382,13 +426,22 @@ class UserProfileService {
           created_at: now.toISOString()
         };
 
-        await this.makeSupabaseRequest(
-          'user_media_preferences',
-          {
-            method: 'POST',
-            body: JSON.stringify(insertData)
-          }
-        );
+        try {
+          console.log(`📝 Inserting preference ${i + 1}/${orderedPreferences.length}: ${preference.title}`);
+          
+          const insertResult = await this.makeSupabaseRequest(
+            'user_media_preferences',
+            {
+              method: 'POST',
+              body: JSON.stringify(insertData)
+            }
+          );
+          
+          console.log(`✅ Preference ${i + 1} inserted successfully`);
+        } catch (insertError) {
+          console.error(`❌ Error inserting preference ${i + 1}:`, insertError);
+          throw new Error(`Failed to insert preference "${preference.title}": ${insertError}`);
+        }
 
         // Small delay to ensure proper ordering
         await new Promise(resolve => setTimeout(resolve, 10));

@@ -7,6 +7,7 @@ import CommentsModal from '@/components/modals/CommentsModal';
 import LikesModal from '@/components/modals/LikesModal';
 import PostOptionsModal from '@/components/modals/PostOptionsModal';
 import { useBookmarks } from '@/contexts/BookmarksContext';
+import { useFavorites } from '@/contexts/FavoritesContext';
 
 interface Media {
   id: string;
@@ -87,6 +88,10 @@ export default function PostCard({ post }: { post: Post }) {
   const { isBookmarked: isPostBookmarked, toggleBookmark } = useBookmarks();
   const isBookmarked = isPostBookmarked(post.id);
   
+  // Use favorites context
+  const { isFavorited: isPostFavorited, toggleFavorite } = useFavorites();
+  const isFavorited = isPostFavorited(post.id);
+  
   // Modal states
   const [showCommentsModal, setShowCommentsModal] = useState(false);
   const [showLikesModal, setShowLikesModal] = useState(false);
@@ -112,10 +117,24 @@ export default function PostCard({ post }: { post: Post }) {
     setShowLikesModal(true);
   };
 
-  const handleBookmarkPress = (e: any) => {
+  const handleBookmarkPress = async (e: any) => {
     e.stopPropagation();
-    const newBookmarkState = toggleBookmark(post);
-    console.log('Bookmark toggled:', newBookmarkState);
+    try {
+      const newBookmarkState = await toggleBookmark(post);
+      console.log('Bookmark toggled:', newBookmarkState);
+    } catch (error) {
+      console.error('Error toggling bookmark:', error);
+    }
+  };
+
+  const handleFavoritePress = async (e: any) => {
+    e.stopPropagation();
+    try {
+      const newFavoriteState = await toggleFavorite(post);
+      console.log('Favorite toggled:', newFavoriteState);
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+    }
   };
 
   const handleOptionsPress = (e: any) => {
@@ -257,6 +276,15 @@ export default function PostCard({ post }: { post: Post }) {
                 name={isBookmarked ? "bookmark" : "bookmark-outline"} 
                 size={18} 
                 color={isBookmarked ? "#004D00" : "#004D00"} 
+                style={styles.actionIcon} 
+              />
+          </TouchableOpacity>
+          
+          <TouchableOpacity style={styles.actionButton} onPress={handleFavoritePress}>
+              <Ionicons 
+                name={isFavorited ? "star" : "star-outline"} 
+                size={18} 
+                color={isFavorited ? "#FFD700" : "#666"} 
                 style={styles.actionIcon} 
               />
           </TouchableOpacity>

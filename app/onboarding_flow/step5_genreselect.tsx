@@ -14,12 +14,34 @@ export default function Step5GenreSelectScreen() {
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [popularItems, setPopularItems] = useState<MediaItem[]>([]);
+  const [isLoadingPopular, setIsLoadingPopular] = useState(true);
+  const [isRefreshingPopular, setIsRefreshingPopular] = useState(false);
 
   // Load popular items on mount
   useEffect(() => {
-    const items = mediaSearchService.getPopularItems();
-    setPopularItems(items);
+    loadPopularItems();
   }, []);
+
+  const loadPopularItems = async () => {
+    try {
+      setIsLoadingPopular(true);
+      console.log('🔥 Loading popular items from APIs...');
+      const items = await mediaSearchService.getPopularItems();
+      setPopularItems(items);
+      console.log(`✅ Popular items loaded: ${items.length} items`);
+    } catch (error) {
+      console.error('❌ Error loading popular items:', error);
+      // Fallback will be handled by the service itself
+    } finally {
+      setIsLoadingPopular(false);
+    }
+  };
+
+  const handleRefreshPopular = async () => {
+    setIsRefreshingPopular(true);
+    await loadPopularItems();
+    setIsRefreshingPopular(false);
+  };
 
   // Search function with debouncing
   useEffect(() => {
@@ -159,21 +181,41 @@ export default function Step5GenreSelectScreen() {
 
   const renderPopularItem = (item: MediaItem, index: number) => {
     const isSelected = selectedMedia.find(selected => selected.id === item.id);
-    const colors = ['#8B4513', '#E6E6FA', '#DEB887', '#F0E68C', '#D3D3D3', '#B0E0E6'];
     
     return (
       <TouchableOpacity
         key={item.id}
         style={[
           styles.gridItem,
-          { backgroundColor: colors[index % colors.length] },
           isSelected && styles.selectedItem
         ]}
         onPress={() => handleMediaSelect(item)}
       >
+        {item.image ? (
+          <Image source={{ uri: item.image }} style={styles.itemImage} />
+        ) : (
+          <View style={[styles.itemImagePlaceholder, { backgroundColor: getMediaTypeColor(item.type) }]}>
+            <Text style={styles.itemEmoji}>{getMediaTypeEmoji(item.type)}</Text>
+          </View>
+        )}
+        {item.rating && (
+          <View style={styles.ratingBadge}>
+            <Text style={styles.ratingText}>⭐ {item.rating.toFixed(1)}</Text>
+          </View>
+        )}
+        {item.source === 'nyt_bestsellers' && (
+          <View style={styles.nytBadge}>
+            <Text style={styles.nytBadgeText}>NYT</Text>
+          </View>
+        )}
         <View style={styles.itemContent}>
-          <Text style={styles.itemTitle}>{item.title}</Text>
-          <Text style={styles.itemType}>{getMediaTypeEmoji(item.type)}</Text>
+          <Text style={styles.itemTitle} numberOfLines={2}>{item.title}</Text>
+          <Text style={styles.itemMeta}>
+            {getMediaTypeEmoji(item.type)} {item.year && `• ${item.year}`}
+          </Text>
+          {item.author && (
+            <Text style={styles.itemAuthor} numberOfLines={1}>{item.author}</Text>
+          )}
         </View>
       </TouchableOpacity>
     );
@@ -234,10 +276,33 @@ export default function Step5GenreSelectScreen() {
             {/* Popular Items - Hide when user has searched */}
             {!hasSearched && (
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Popular</Text>
-                <View style={styles.grid}>
-                  {popularItems.map((item, index) => renderPopularItem(item, index))}
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>Trending Now</Text>
+                  <TouchableOpacity 
+                    style={styles.refreshButton} 
+                    onPress={handleRefreshPopular}
+                    disabled={isLoadingPopular || isRefreshingPopular}
+                  >
+                    <Text style={styles.refreshButtonText}>
+                      {isRefreshingPopular ? '⟳' : '↻'}
+                    </Text>
+                  </TouchableOpacity>
                 </View>
+                {popularItems.length > 0 && (
+                  <Text style={styles.sourceInfo}>
+                    From TMDB & NY Times • Equal mix of movies, shows & books
+                  </Text>
+                )}
+                {isLoadingPopular ? (
+                  <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color="#142D0A" />
+                    <Text style={styles.loadingText}>Loading trending content...</Text>
+                  </View>
+                ) : (
+                  <View style={styles.grid}>
+                    {popularItems.map((item, index) => renderPopularItem(item, index))}
+                  </View>
+                )}
               </View>
             )}
 
@@ -369,13 +434,33 @@ const styles = StyleSheet.create({
   section: {
     marginBottom: 40,
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
   sectionTitle: {
     fontSize: 20,
     fontWeight: '500',
     color: '#142D0A',
-    marginBottom: 20,
-    textAlign: 'center',
     fontFamily: 'LibreBaskerville_700Bold',
+  },
+  refreshButton: {
+    backgroundColor: '#FF6B6B',
+    borderRadius: 20,
+    padding: 8,
+  },
+  refreshButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  sourceInfo: {
+    fontSize: 12,
+    color: '#8B9A7D',
+    marginBottom: 10,
+    fontFamily: 'LibreBaskerville_400Regular',
   },
   grid: {
     flexDirection: 'row',
@@ -387,16 +472,38 @@ const styles = StyleSheet.create({
     width: '30%',
     aspectRatio: 0.7,
     borderRadius: 10,
-    padding: 10,
-    justifyContent: 'flex-end',
+    overflow: 'hidden',
     borderWidth: 1.84,
     borderColor: '#142D0A',
+    backgroundColor: 'white',
   },
   selectedItem: {
     borderWidth: 3,
     borderColor: '#142D0A',
   },
+  itemImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 10,
+  },
+  itemImagePlaceholder: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  itemEmoji: {
+    fontSize: 24,
+    color: 'white',
+  },
   itemContent: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    padding: 8,
     alignItems: 'center',
   },
   itemTitle: {
@@ -406,9 +513,14 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontFamily: 'LibreBaskerville_700Bold',
   },
-  itemType: {
+  itemMeta: {
     fontSize: 12,
-    color: '#142D0A',
+    color: '#8B9A7D',
+    fontFamily: 'LibreBaskerville_400Regular',
+  },
+  itemAuthor: {
+    fontSize: 10,
+    color: '#8B9A7D',
     fontFamily: 'LibreBaskerville_400Regular',
   },
   bottomText: {
@@ -593,5 +705,44 @@ const styles = StyleSheet.create({
     marginBottom: 40,
     lineHeight: 20,
     fontFamily: 'LibreBaskerville_400Regular_Italic',
+  },
+  ratingBadge: {
+    position: 'absolute',
+    top: 5,
+    right: 5,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    borderRadius: 10,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+  },
+  ratingText: {
+    fontSize: 10,
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  nytBadge: {
+    position: 'absolute',
+    top: 5,
+    left: 5,
+    backgroundColor: '#1a1a1a',
+    borderRadius: 10,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+  },
+  nytBadgeText: {
+    fontSize: 10,
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: {
+    fontSize: 14,
+    color: '#142D0A',
+    marginLeft: 10,
+    fontFamily: 'LibreBaskerville_400Regular',
   },
 });

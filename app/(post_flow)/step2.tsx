@@ -8,6 +8,7 @@ import {
   ScrollView,
   Modal,
   FlatList,
+  Alert,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -32,6 +33,9 @@ const mediaFields: MediaFields = {
       "mystery",
       "sci-fi",
       "non-fiction",
+      "biography",
+      "thriller",
+      "literary fiction",
       "other",
     ],
   },
@@ -43,7 +47,11 @@ const mediaFields: MediaFields = {
       "comedy",
       "drama",
       "horror",
+      "sci-fi",
+      "thriller",
+      "romance",
       "documentary",
+      "animation",
       "other",
     ],
   },
@@ -53,9 +61,13 @@ const mediaFields: MediaFields = {
     genreOptions: [
       "drama",
       "comedy",
+      "thriller",
+      "sci-fi",
       "reality",
       "documentary",
       "anime",
+      "crime",
+      "fantasy",
       "other",
     ],
   },
@@ -146,14 +158,45 @@ export default function Step2() {
     mediaFields[type as keyof MediaFields]?.genreOptions[0] || ""
   );
 
+  const fields = mediaFields[type as keyof MediaFields];
+
+  const validateForm = () => {
+    if (!title.trim()) {
+      Alert.alert('Missing Information', `Please enter the ${type} title.`);
+      return false;
+    }
+    if (!creator.trim()) {
+      Alert.alert('Missing Information', `Please enter the ${fields.creatorLabel.replace(':', '')}.`);
+      return false;
+    }
+    return true;
+  };
+
   const handleNext = () => {
+    if (!validateForm()) {
+      return;
+    }
+
     router.push({
       pathname: "/(post_flow)/step3",
-      params: { type, title, creator, year, genre },
+      params: { 
+        type, 
+        title: title.trim(), 
+        creator: creator.trim(), 
+        year, 
+        genre 
+      },
     });
   };
 
-  const fields = mediaFields[type as keyof MediaFields];
+  const handleImageUpload = () => {
+    // TODO: Implement image picker functionality
+    Alert.alert(
+      'Image Upload',
+      'Image upload functionality will be implemented in a future update.',
+      [{ text: 'OK' }]
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -173,30 +216,36 @@ export default function Step2() {
 
           <Text style={styles.headerTitle}>write a new revue</Text>
           <Text style={styles.stepTitle}>STEP 2</Text>
+          <Text style={styles.stepSubtitle}>
+            Tell us about the {type} you're revuing
+          </Text>
 
-          <Text style={styles.label}>title of {type}:</Text>
+          <Text style={styles.label}>title of {type}: *</Text>
           <TextInput
             style={styles.input}
-            placeholder="Type something"
+            placeholder={`Enter ${type} title`}
             value={title}
             onChangeText={setTitle}
             placeholderTextColor="#666"
+            autoCapitalize="words"
           />
 
-          <Text style={styles.label}>{fields.creatorLabel}</Text>
+          <Text style={styles.label}>{fields.creatorLabel} *</Text>
           <TextInput
             style={styles.input}
-            placeholder="Type something"
+            placeholder={`Enter ${fields.creatorLabel.replace(':', '')}`}
             value={creator}
             onChangeText={setCreator}
             placeholderTextColor="#666"
+            autoCapitalize="words"
           />
 
           <Text style={styles.label}>optional:</Text>
-          <View style={styles.placeholderImage}>
+          <TouchableOpacity style={styles.placeholderImage} onPress={handleImageUpload}>
             <Ionicons name="image-outline" size={32} color="#2F4F4F" />
             <Text style={styles.placeholderText}>{fields.uploadLabel}</Text>
-          </View>
+            <Text style={styles.placeholderSubtext}>Tap to select from library</Text>
+          </TouchableOpacity>
 
           <Dropdown
             label="year created:"
@@ -247,12 +296,18 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontStyle: "italic",
     textAlign: "center",
-    marginBottom: 40,
+    marginBottom: 20,
   },
   stepTitle: {
     fontSize: 24,
     fontWeight: "bold",
     color: "#2F4F4F",
+    textAlign: "center",
+    marginBottom: 10,
+  },
+  stepSubtitle: {
+    fontSize: 16,
+    color: "#666",
     textAlign: "center",
     marginBottom: 40,
   },
@@ -267,6 +322,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     fontSize: 16,
     marginBottom: 20,
+    borderWidth: 1,
+    borderColor: "#E8E4D8",
   },
   placeholderImage: {
     backgroundColor: "#F2EFE6",
@@ -274,11 +331,20 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: "center",
     marginBottom: 20,
+    borderWidth: 1,
+    borderColor: "#E8E4D8",
+    borderStyle: "dashed",
   },
   placeholderText: {
     fontSize: 16,
     color: "#2F4F4F",
     marginTop: 10,
+    fontWeight: "500",
+  },
+  placeholderSubtext: {
+    fontSize: 12,
+    color: "#666",
+    marginTop: 4,
   },
   pickerButton: {
     backgroundColor: "#F2EFE6",
@@ -288,6 +354,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 20,
+    borderWidth: 1,
+    borderColor: "#E8E4D8",
   },
   pickerText: {
     fontSize: 16,
