@@ -169,8 +169,10 @@ export default function CommunityDetailScreen() {
   };
 
   const handleUserPress = (userId: string) => {
-    // Navigate to user profile
-    router.push(`/profile/${userId}`);
+    // Navigate to user profile - using a more generic path structure
+    console.log('Navigate to profile:', userId);
+    // TODO: Implement profile navigation when profile routes are available
+    // router.push(`/profile/${userId}` as any);
   };
 
   const renderFooter = () => {

@@ -173,6 +173,9 @@ class UserProfileService {
       }
 
       console.log('🔄 Fetching user media preferences for:', targetUserId);
+      console.log('🔍 Session user ID:', session.data.session?.user?.id);
+      console.log('🔍 Provided user ID:', userId);
+      console.log('🔍 Using target user ID:', targetUserId);
 
       const preferences = await this.callRPC('get_user_media_preferences', {
         p_user_id: targetUserId

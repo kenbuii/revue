@@ -1,13 +1,20 @@
 import React, { useState } from 'react';
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { router } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import CommentsModal from '@/components/modals/CommentsModal';
 import LikesModal from '@/components/modals/LikesModal';
 import PostOptionsModal from '@/components/modals/PostOptionsModal';
 import { useBookmarks } from '@/contexts/BookmarksContext';
-import { useFavorites } from '@/contexts/FavoritesContext';
+// Phase 4: Use new unified contexts
+import { usePostInteractions } from '@/contexts/PostInteractionsContext';
+import { useComments } from '@/contexts/CommentsContext';
+import { useHiddenPosts } from '@/contexts/HiddenPostsContext';
+
+// Import our new modular components
+import PostHeader from '@/components/post/PostHeader';
+import PostContent from '@/components/post/PostContent';
+import PostActions from '@/components/post/PostActions';
+import PostStats from '@/components/post/PostStats';
 
 interface Media {
   id: string;
@@ -37,69 +44,41 @@ interface Post {
   isLiked?: boolean;
 }
 
-// Mock data for comments and likes
-const mockComments = [
-  {
-    id: '1',
-    user: { name: 'Alice', avatar: 'https://randomuser.me/api/portraits/women/1.jpg' },
-    content: 'This is such a great review! I totally agree with your thoughts.',
-    timestamp: '2h ago',
-    likeCount: 5,
-    isLiked: false,
-  },
-  {
-    id: '2',
-    user: { name: 'Charlie', avatar: 'https://randomuser.me/api/portraits/men/2.jpg' },
-    content: 'Interesting perspective. I had a different take on this part.',
-    timestamp: '3h ago',
-    likeCount: 8,
-    isLiked: true,
-  }
-];
-
-const mockLikes = [
-  {
-    id: '1',
-    name: 'Alice Johnson',
-    avatar: 'https://randomuser.me/api/portraits/women/1.jpg',
-    username: 'alice_j'
-  },
-  {
-    id: '2',
-    name: 'Bob Smith',
-    avatar: 'https://randomuser.me/api/portraits/men/1.jpg',
-    username: 'bobsmith'
-  },
-  {
-    id: '3',
-    name: 'Charlie Brown',
-    avatar: 'https://randomuser.me/api/portraits/men/2.jpg',
-    username: 'charlie_b'
-  }
-];
-
 export default function PostCard({ post }: { post: Post }) {
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [numberOfLines, setNumberOfLines] = useState<number | undefined>(4);
-  const [isLiked, setIsLiked] = useState(post.isLiked || false);
-  const [likeCount, setLikeCount] = useState(post.likeCount);
+  // Phase 4: Enhanced state management with new contexts
+  const [showCommentsModal, setShowCommentsModal] = useState(false);
+  const [showLikesModal, setShowLikesModal] = useState(false);
+  const [showOptionsModal, setShowOptionsModal] = useState(false);
   
   // Use bookmarks context
   const { isBookmarked: isPostBookmarked, toggleBookmark } = useBookmarks();
   const isBookmarked = isPostBookmarked(post.id);
   
-  // Use favorites context
-  const { isFavorited: isPostFavorited, toggleFavorite } = useFavorites();
-  const isFavorited = isPostFavorited(post.id);
+  // Phase 4: Use unified post interactions context
+  const { 
+    isLiked: isPostLiked, 
+    isFavorited: isPostFavorited, 
+    toggleLike, 
+    toggleFavorite 
+  } = usePostInteractions();
   
-  // Modal states
-  const [showCommentsModal, setShowCommentsModal] = useState(false);
-  const [showLikesModal, setShowLikesModal] = useState(false);
-  const [showOptionsModal, setShowOptionsModal] = useState(false);
+  // Phase 4: Use comments context for real-time comment count
+  const { getCommentCount } = useComments();
+  
+  // Phase 4: Use hidden posts context
+  const { hidePost, reportPost } = useHiddenPosts();
+  
+  // Enhanced state with Phase 4 contexts
+  const isLiked = isPostLiked(post.id);
+  const isFavorited = isPostFavorited(post.id);
+  const commentCount = getCommentCount(post.id) || post.commentCount; // Fallback to post data
+  
+  // Local state for optimistic updates
+  const [localLikeCount, setLocalLikeCount] = useState(post.likeCount);
 
   const handleMediaPress = () => {
     console.log('Media pressed, navigating to media detail page');
-    router.push('/media/1');
+    router.push(`/media/${post.media.id}`);
   };
 
   const handlePostPress = () => {
@@ -107,18 +86,18 @@ export default function PostCard({ post }: { post: Post }) {
     router.push(`/post/${post.id}`);
   };
 
-  const handleCommentsPress = (e: any) => {
-    e.stopPropagation();
+  const handleCommentsPress = (e?: any) => {
+    if (e) e.stopPropagation();
     setShowCommentsModal(true);
   };
 
-  const handleLikesPress = (e: any) => {
-    e.stopPropagation();
+  const handleLikesPress = (e?: any) => {
+    if (e) e.stopPropagation();
     setShowLikesModal(true);
   };
 
-  const handleBookmarkPress = async (e: any) => {
-    e.stopPropagation();
+  const handleBookmarkPress = async (e?: any) => {
+    if (e) e.stopPropagation();
     try {
       const newBookmarkState = await toggleBookmark(post);
       console.log('Bookmark toggled:', newBookmarkState);
@@ -127,8 +106,8 @@ export default function PostCard({ post }: { post: Post }) {
     }
   };
 
-  const handleFavoritePress = async (e: any) => {
-    e.stopPropagation();
+  const handleFavoritePress = async (e?: any) => {
+    if (e) e.stopPropagation();
     try {
       const newFavoriteState = await toggleFavorite(post);
       console.log('Favorite toggled:', newFavoriteState);
@@ -137,173 +116,132 @@ export default function PostCard({ post }: { post: Post }) {
     }
   };
 
-  const handleOptionsPress = (e: any) => {
-    e.stopPropagation();
+  // Phase 4: Enhanced like functionality with real database integration
+  const handleLikePress = async (e?: any) => {
+    if (e) e.stopPropagation();
+    
+    // Optimistic update for like count
+    const previousLikeCount = localLikeCount;
+    const increment = isLiked ? -1 : 1;
+    setLocalLikeCount(prev => prev + increment);
+
+    try {
+      console.log('Like toggled for post:', post.id);
+      
+      // Phase 4: Use real like functionality
+      const newLikeState = await toggleLike(post);
+      console.log('Like state updated:', newLikeState);
+      
+    } catch (error) {
+      // Revert optimistic update on error
+      setLocalLikeCount(previousLikeCount);
+      console.error('Error toggling like:', error);
+    }
+  };
+
+  const handleOptionsPress = (e?: any) => {
+    if (e) e.stopPropagation();
     setShowOptionsModal(true);
   };
 
-  const handleHidePost = (postId: string) => {
+  // Phase 4: Enhanced hide post functionality
+  const handleHidePost = async (postId: string) => {
     console.log('Hiding post:', postId);
-    // TODO: Implement hide post functionality
-  };
-
-  const handleReportPost = (postId: string, reason: string) => {
-    console.log('Reporting post:', postId, 'for:', reason);
-    // TODO: Implement report post functionality
-  };
-
-  const toggleExpand = () => {
-    setIsExpanded(!isExpanded);
-    setNumberOfLines(isExpanded ? 4 : undefined);
-  };
-
-  const renderContent = () => {
-    if (post.contentType === 'image') {
-      return (
-        <View style={styles.imageContainer}>
-          <Image 
-            source={{ uri: post.content }} 
-            style={styles.contentImage} 
-            resizeMode="contain"
-          />
-        </View>
-      );
-    } else if (post.contentType === 'text') {
-      return (
-        <View>
-          <Text 
-            style={styles.contentText} 
-            numberOfLines={numberOfLines}
-            onTextLayout={({ nativeEvent: { lines } }) => {
-              if (lines.length > 4 && !isExpanded) {
-                setNumberOfLines(4);
-              }
-            }}
-          >
-            {post.content}
-          </Text>
-          {post.content.length > 0 && (
-            <TouchableOpacity onPress={toggleExpand} style={styles.readMoreButton}>
-              <Text style={styles.readMoreText}>
-                {isExpanded ? 'Show less' : 'Read more'}
-              </Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      );
-    } else if (post.contentType === 'mixed') {
-      return (
-        <View>
-          <Text 
-            style={styles.contentText} 
-            numberOfLines={numberOfLines}
-            onTextLayout={({ nativeEvent: { lines } }) => {
-              if (lines.length > 4 && !isExpanded) {
-                setNumberOfLines(4);
-              }
-            }}
-          >
-            {post.textContent}
-          </Text>
-          {post.textContent && post.textContent.length > 0 && (
-            <TouchableOpacity onPress={toggleExpand} style={styles.readMoreButton}>
-              <Text style={styles.readMoreText}>
-                {isExpanded ? 'Show less' : 'Read more'}
-              </Text>
-            </TouchableOpacity>
-          )}
-          <View style={styles.imageContainer}>
-            <Image 
-              source={{ uri: post.content }} 
-              style={styles.contentImage} 
-              resizeMode="contain"
-            />
-          </View>
-        </View>
-      );
+    try {
+      const result = await hidePost(postId, 'user_hidden');
+      if (result.success) {
+        console.log('✅ Post hidden successfully');
+        // The post will be filtered out in the feed automatically
+      } else {
+        console.error('❌ Failed to hide post:', result.error);
+      }
+    } catch (error) {
+      console.error('Error hiding post:', error);
     }
-    return null;
+  };
+
+  // Phase 4: Enhanced report post functionality with auto-hide
+  const handleReportPost = async (postId: string, reason: string) => {
+    console.log('Reporting post:', postId, 'for:', reason);
+    try {
+      // Map generic reason to specific report reason
+      const reportReason = reason.toLowerCase().replace(' ', '_') as any;
+      const result = await reportPost(postId, reportReason);
+      
+      if (result.success) {
+        console.log('✅ Post reported and hidden successfully');
+        // The post will be filtered out automatically
+      } else {
+        console.error('❌ Failed to report post:', result.error);
+      }
+    } catch (error) {
+      console.error('Error reporting post:', error);
+    }
   };
 
   return (
     <>
-      <TouchableOpacity style={styles.container} onPress={handlePostPress} activeOpacity={0.95}>
-        <View style={styles.header}>
-          <View style={styles.userInfo}>
-            <Image source={{ uri: post.user.avatar }} style={styles.avatar} />
-            <View style={styles.userTextContainer}>
-              <Text style={styles.username}>{post.user.name}</Text>
-              <Text style={styles.reviewingText}>is revuing</Text>
-            </View>
-          </View>
-          
-          <TouchableOpacity onPress={handleOptionsPress}>
-            <Feather name="more-horizontal" size={24} color="black" />
-          </TouchableOpacity>
-        </View>
+      <TouchableOpacity 
+        style={styles.container} 
+        onPress={handlePostPress} 
+        activeOpacity={0.95}
+      >
+        {/* Post Header - User info and media info */}
+        <PostHeader
+          user={post.user}
+          media={post.media}
+          date={post.date}
+          onOptionsPress={handleOptionsPress}
+          onMediaPress={handleMediaPress}
+        />
         
-        <TouchableOpacity 
-          onPress={handleMediaPress}
-          style={styles.mediaInfoContainer}
-          activeOpacity={0.7}
-        >
-          <View style={styles.mediaInfo}>
-            <View>
-              <Text style={styles.mediaTitle}>{post.media.title}</Text>
-              <Text style={styles.mediaDetails}>{post.date} • {post.media.type} {post.media.progress}</Text>
-            </View>
-            <Image source={{ uri: post.media.cover }} style={styles.mediaCover} />
-          </View>
-        </TouchableOpacity>
+        {/* Post Content - Title, text, and images */}
+        <PostContent
+          title={post.title}
+          contentType={post.contentType}
+          content={post.content}
+          textContent={post.textContent}
+          expandable={true}
+          maxLines={4}
+        />
         
-        {post.title && <Text style={styles.postTitle}>{post.title}</Text>}
+        {/* Post Stats - Like and comment counts (Phase 4: Enhanced with real-time data) */}
+        <PostStats
+          commentCount={commentCount}
+          likeCount={localLikeCount}
+          onCommentsPress={handleCommentsPress}
+          onLikesPress={handleLikesPress}
+          showLabels={true}
+          isCompact={false}
+        />
         
-        {renderContent()}
-        
-        <View style={styles.actions}>
-          <TouchableOpacity style={styles.actionButton} onPress={handleCommentsPress}>
-              <Ionicons name="chatbox-ellipses-outline" size={18} color="#004D00" style={styles.actionIcon} />
-              <Text style={styles.actionText}>{post.commentCount} comments</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.actionButton} onPress={handleLikesPress}>
-              <Ionicons name="heart-outline" size={18} color="#004D00" style={styles.actionIcon} />
-              <Text style={styles.actionText}>{likeCount} likes</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.actionButton} onPress={handleBookmarkPress}>
-              <Ionicons 
-                name={isBookmarked ? "bookmark" : "bookmark-outline"} 
-                size={18} 
-                color={isBookmarked ? "#004D00" : "#004D00"} 
-                style={styles.actionIcon} 
-              />
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.actionButton} onPress={handleFavoritePress}>
-              <Ionicons 
-                name={isFavorited ? "star" : "star-outline"} 
-                size={18} 
-                color={isFavorited ? "#FFD700" : "#666"} 
-                style={styles.actionIcon} 
-              />
-          </TouchableOpacity>
-        </View>
+        {/* Post Actions - Action buttons (Phase 4: Enhanced with merged like/favorite) */}
+        <PostActions
+          postId={post.id}
+          isBookmarked={isBookmarked}
+          isFavorited={isFavorited}
+          isLiked={isLiked}
+          onCommentsPress={handleCommentsPress}
+          onLikesPress={handleLikesPress}
+          onBookmarkPress={handleBookmarkPress}
+          onFavoritePress={handleFavoritePress}
+          onLikePress={handleLikePress}
+        />
       </TouchableOpacity>
 
-      {/* Modals */}
+      {/* Enhanced Modals with Phase 4 Context Integration */}
       <CommentsModal
         visible={showCommentsModal}
         onClose={() => setShowCommentsModal(false)}
-        comments={mockComments}
         postId={post.id}
+        initialCommentCount={commentCount}
       />
 
       <LikesModal
         visible={showLikesModal}
         onClose={() => setShowLikesModal(false)}
-        likes={mockLikes}
         postId={post.id}
+        initialLikeCount={localLikeCount}
       />
 
       <PostOptionsModal
@@ -324,105 +262,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     borderBottomWidth: 1,
     borderBottomColor: '#E8E8E8',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  userInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 10,
-  },
-  userTextContainer: {
-    justifyContent: 'center',
-  },
-  username: {
-    fontWeight: '500',
-    fontSize: 16,
-  },
-  reviewingText: {
-    color: '#666',
-    fontSize: 14,
-  },
-  mediaInfoContainer: {
-    backgroundColor: '#F5F5F5',
-    borderRadius: 8,
-    padding: 8,
-    marginBottom: 10,
-  },
-  mediaInfo: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  mediaTitle: {
-    color: '#004D00',
-    fontWeight: 'bold',
-    fontSize: 16,
-    maxWidth: 250,
-  },
-  mediaDetails: {
-    color: '#666',
-    fontSize: 14,
-  },
-  mediaCover: {
-    width: 50,
-    height: 70,
-    borderRadius: 5,
-  },
-  postTitle: {
-    fontSize: 17,
-    fontWeight: '500',
-    marginBottom: 8,
-  },
-  imageContainer: {
-    width: '100%',
-    aspectRatio: 1,
-    borderRadius: 8,
-    marginBottom: 10,
-  },
-  contentImage: {
-    width: '100%',
-    aspectRatio: 1,
-    borderRadius: 8,
-  },
-  contentText: {
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 8,
-  },
-  actions: {
-    flexDirection: 'row',
-    marginTop: 5,
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginRight: 20,
-  },
-  actionIcon: {
-    width: 20,
-    height: 20,
-    marginRight: 5,
-    marginTop: 5,
-  },
-  actionText: {
-    color: '#666',
-    fontSize: 14,
-  },
-  readMoreButton: {
-    marginTop: 4,
-  },
-  readMoreText: {
-    color: '#004D00',
-    fontSize: 14,
-    fontWeight: '500',
   },
 });

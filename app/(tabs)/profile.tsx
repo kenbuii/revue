@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View, Image, ScrollView, TouchableOpacity, FlatList, ActivityIndicator, Alert, RefreshControl } from 'react-native';
 import { Feather, AntDesign, Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -10,139 +10,144 @@ import { useAuth } from '@/contexts/AuthContext';
 import HorizontalDragDropCarousel from '@/components/HorizontalDragDropCarousel';
 import { MediaPreference } from '@/lib/userProfile';
 import ProfileEditForm from '@/components/ProfileEditForm';
+import { feedService, FeedPost } from '@/lib/feedService';
 
-// Remove mock data - now using real data from context
-const recentRevues = [
-  { 
-    id: '1', 
-    title: 'Never Let Me Go, Chapter 4',
-    time: '4 days ago',
-    content: 'suzanne collins got tired of us forgetting what fascism is... i\'m so tired of lorem epsom the lazy fox jumps over the moon and eats pie. Lorem Ipsum has been the industry\'s standard dum...',
-    cover: 'https://m.media-amazon.com/images/I/71DgZ3LElXL.jpg'
-  },
-  { 
-    id: '2', 
-    title: 'Sunrise on the Reaping, Chapter 6',
-    time: '4 days ago',
-    content: 'suzanne collins got tired of us forgetting what fascism is... i\'m so tired of lorem epsom the lazy fox jumps over the moon and eats pie. Lorem Ipsum has been the industry\'s standard dum...',
-    cover: 'https://prodimage.images-bn.com/pimages/9781546171461_p0_v5_s1200x630.jpg'
-  },
-];
-
+// Remove mock data - now using real data from feedService
 export default function ProfileScreen() {
   const { bookmarkedPosts } = useBookmarks();
-  const { isAuthenticated } = useAuth();
   const { 
     profile, 
-    stats, 
     mediaPreferences, 
-    recentReviews: userRecentReviews,
-    likedPosts,
+    likedPosts, 
     loadingProfile, 
-    loadingStats, 
-    loadingMedia,
+    loadingMedia, 
     loadingLikedPosts,
-    profileError,
-    refreshAll,
+    refreshProfile,
+    refreshMediaPreferences,
     removeMediaPreference,
     updateMediaPreferencesOrder
   } = useUserProfile();
+  const { isAuthenticated } = useAuth();
   
-  // Add bookmark removal handler
-  const { removeBookmark } = useBookmarks();
-  const [refreshing, setRefreshing] = React.useState(false);
-  
-  const handleRemoveBookmark = async (postId: string, title: string) => {
-    Alert.alert(
-      'Remove Bookmark',
-      `Remove "${title}" from your bookmarks?`,
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await removeBookmark(postId);
-              // Optional: Add success feedback
-              Alert.alert(
-                'Bookmark Removed',
-                'The bookmark has been removed successfully.',
-                [{ text: 'OK' }],
-                { cancelable: true }
-              );
-            } catch (error) {
-              console.error('Error removing bookmark:', error);
-              Alert.alert('Error', 'Failed to remove bookmark. Please try again.');
-            }
-          },
-        },
-      ]
-    );
+  // State for recent revues
+  const [recentRevues, setRecentRevues] = useState<FeedPost[]>([]);
+  const [loadingRevues, setLoadingRevues] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+
+  // Load user's recent posts
+  useEffect(() => {
+    if (isAuthenticated && profile?.id) {
+      loadRecentRevues();
+    }
+  }, [isAuthenticated, profile?.id]);
+
+  const loadRecentRevues = async () => {
+    try {
+      setLoadingRevues(true);
+      console.log('📋 Loading user recent revues...');
+      
+      const userPosts = await feedService.getUserPosts(profile?.id, 10); // Load last 10 posts
+      setRecentRevues(userPosts);
+      
+      console.log(`✅ Loaded ${userPosts.length} recent revues for user`);
+    } catch (error) {
+      console.error('❌ Error loading recent revues:', error);
+    } finally {
+      setLoadingRevues(false);
+    }
   };
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await refreshAll();
-    setRefreshing(false);
+    try {
+      // Refresh profile data and recent revues
+      await Promise.all([
+        refreshProfile(),
+        loadRecentRevues(),
+      ]);
+    } catch (error) {
+      console.error('❌ Error refreshing profile:', error);
+    } finally {
+      setRefreshing(false);
+    }
   };
-  
-  // Debug logging in development
-  if (__DEV__) {
-    console.log('🔍 Profile Screen Debug:', {
-      isAuthenticated,
-      hasProfile: !!profile,
-      profileData: profile,
-      profileFields: {
-        id: profile?.id,
-        username: profile?.username,
-        display_name: profile?.display_name,
-        bio: profile?.bio,
-        avatar_url: profile?.avatar_url,
-        onboarding_completed: profile?.onboarding_completed,
-      },
-      loadingProfile,
-      profileError,
-      statsData: stats,
-      mediaPrefsCount: mediaPreferences.length,
-      mediaPrefsData: mediaPreferences,
-      loadingMedia
+
+  const handleEditProfile = () => {
+    setIsEditingProfile(true);
+  };
+
+  const handleCloseEditProfile = () => {
+    setIsEditingProfile(false);
+  };
+
+  const handleSaveProfile = () => {
+    setIsEditingProfile(false);
+    // Profile will be refreshed automatically through context
+  };
+
+  const handleAddToBookshelf = () => {
+    router.push('/(tabs)/search');
+  };
+
+  const handleBookmarksPress = () => {
+    router.push('/bookmarks');
+  };
+
+  const handleSettingsPress = () => {
+    // Navigate to settings screen
+    router.push('/settings');
+  };
+
+  const handleRevuePress = (post: FeedPost) => {
+    // Navigate to post detail
+    router.push({
+      pathname: '/post/[id]' as const,
+      params: { id: post.id }
     });
-  }
-  
-  const SettingsButton = () => (
-    <TouchableOpacity 
-      style={styles.settingsButton}
-      onPress={() => router.push('../settings')}
-    >
-      <Feather name="settings" size={24} color="#000" />
-    </TouchableOpacity>
-  );
+  };
 
-  // Handle case where user is not authenticated
-  if (!isAuthenticated) {
+  const handleMediaPress = (post: FeedPost) => {
+    // Navigate to media detail
+    router.push({
+      pathname: '/media/[id]' as const,
+      params: {
+        id: post.media.id,
+        title: post.media.title,
+        type: post.media.type,
+        year: '',
+        image: post.media.cover,
+        description: '',
+      },
+    });
+  };
+
+  const formatPostDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (diffInDays === 0) {
+      return 'Today';
+    } else if (diffInDays === 1) {
+      return 'Yesterday';
+    } else if (diffInDays < 7) {
+      return `${diffInDays} days ago`;
+    } else {
+      return date.toLocaleDateString();
+    }
+  };
+
+  // Debug function to force media preferences refresh
+  const forceRefreshMedia = async () => {
+    console.log('🔄 FORCE REFRESH: Manual media preferences refresh triggered');
+    await refreshMediaPreferences();
+  };
+
+  if (loadingProfile) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.headerContainer}>
-          <AppHeader rightComponent={<SettingsButton />} />
-        </View>
-        <View style={styles.unauthenticatedContainer}>
-          <Text style={styles.unauthenticatedText}>Please sign in to view your profile</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  // Show loading state
-  if (loadingProfile && !profile) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.headerContainer}>
-          <AppHeader rightComponent={<SettingsButton />} />
-        </View>
+        <AppHeader />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#004D00" />
           <Text style={styles.loadingText}>Loading profile...</Text>
@@ -151,272 +156,293 @@ export default function ProfileScreen() {
     );
   }
 
-  // Show error state with fallback
-  if (profileError && !profile) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.headerContainer}>
-          <AppHeader rightComponent={<SettingsButton />} />
-        </View>
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>Failed to load profile</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={refreshAll}>
-            <Text style={styles.retryButtonText}>Retry</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  // Get user display data
-  const displayName = profile?.display_name || 'User';
-  const username = profile?.username ? `@${profile.username}` : '@username';
-  const bio = profile?.bio || 'Welcome to my profile';
-  const avatarUrl = profile?.avatar_url;
-
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.headerContainer}>
-        <AppHeader rightComponent={<SettingsButton />} />
-      </View>
-      <ScrollView 
-        style={styles.scrollContent}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor="#004D00"
-            colors={['#004D00']}
-          />
-        }
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Profile Info */}
-        <View style={styles.profileContainer}>
-          <View style={styles.profileInfo}>
-            <Image 
-              style={styles.avatar} 
-              source={{ 
-                uri: avatarUrl || 'https://via.placeholder.com/100' 
-              }} 
+      <AppHeader />
+      
+      {isEditingProfile ? (
+        <ProfileEditForm 
+          onClose={handleCloseEditProfile}
+          onSuccess={handleSaveProfile}
+        />
+      ) : (
+        <ScrollView
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor="#004D00"
+              colors={['#004D00']}
             />
-            <View style={styles.userInfo}>
-              <View style={styles.nameContainer}>
-                <Text style={styles.name}>
-                  {displayName} <Text style={styles.username}>{username}</Text>
-                </Text>
-                <TouchableOpacity 
-                  style={styles.bookmarkButton}
-                  onPress={() => router.push('../bookmarks')}
-                >
-                  <Feather name="bookmark" size={20} color="#004D00" />
-                </TouchableOpacity>
+          }
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Profile Header */}
+          <View style={styles.profileHeader}>
+            <View style={styles.headerLeft}>
+              <View style={styles.avatarContainer}>
+                {profile?.avatar_url ? (
+                  <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />
+                ) : (
+                  <View style={styles.avatarPlaceholder}>
+                    <Feather name="user" size={40} color="#888" />
+                  </View>
+                )}
               </View>
-              <Text style={styles.bio}>{bio}</Text>
-              <View style={styles.statsContainer}>
-                <View style={styles.statItem}>
-                  <Text style={styles.statNumber}>
-                    {loadingStats ? '...' : stats.reviewCount}
+              <View style={styles.userInfo}>
+                <View style={styles.nameContainer}>
+                  <Text style={styles.name}>
+                    {profile?.display_name || profile?.username || 'Anonymous User'}
+                    <Text style={styles.username}>
+                      {profile?.display_name ? ` @${profile.username}` : ''}
+                    </Text>
                   </Text>
-                  <Text style={styles.statLabel}>revues</Text>
                 </View>
-                <View style={styles.statItem}>
-                  <Text style={styles.statNumber}>
-                    {loadingStats ? '...' : stats.followers}
-                  </Text>
-                  <Text style={styles.statLabel}>followers</Text>
-                </View>
-                <View style={styles.statItem}>
-                  <Text style={styles.statNumber}>
-                    {loadingStats ? '...' : stats.following}
-                  </Text>
-                  <Text style={styles.statLabel}>following</Text>
+                {profile?.bio && (
+                  <Text style={styles.bio}>{profile.bio}</Text>
+                )}
+                <View style={styles.statsContainer}>
+                  <View style={styles.statItem}>
+                    <Text style={styles.statNumber}>{recentRevues.length}</Text>
+                    <Text style={styles.statLabel}>revues</Text>
+                  </View>
+                  <View style={styles.statItem}>
+                    <Text style={styles.statNumber}>{likedPosts.length}</Text>
+                    <Text style={styles.statLabel}>likes</Text>
+                  </View>
+                  <View style={styles.statItem}>
+                    <Text style={styles.statNumber}>{bookmarkedPosts.length}</Text>
+                    <Text style={styles.statLabel}>saved</Text>
+                  </View>
                 </View>
               </View>
             </View>
+            <View style={styles.headerButtons}>
+              {/* <TouchableOpacity style={styles.debugButton} onPress={forceRefreshMedia}>
+                <Feather name="refresh-cw" size={20} color="#FF6B35" />
+              </TouchableOpacity> */}
+              <TouchableOpacity style={styles.editButton} onPress={handleEditProfile}>
+                <Feather name="edit-2" size={20} color="#004D00" />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.settingsButton} onPress={handleSettingsPress}>
+                <Feather name="settings" size={20} color="#004D00" />
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
 
-        {/* Bookmarks Section */}
-        {bookmarkedPosts.length > 0 && (
+          {/* My Bookshelf Section */}
           <View style={styles.sectionContainer}>
-            <Text style={styles.sectionTitle}>BOOKMARKS</Text>
-            <ScrollView 
-              horizontal 
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.horizontalScrollContent}
-            >
-              {bookmarkedPosts.map(post => (
-                <TouchableOpacity 
-                  key={post.id} 
-                  style={styles.bookmarkCard}
-                  onPress={() => router.push({
-                    pathname: '/media/[id]' as const,
-                    params: {
-                      id: post.media.id || post.id,
-                      title: post.media.title || 'Unknown Title',
-                      type: post.media.type || 'media',
-                      year: '', // Bookmarks don't currently store year
-                      image: post.media.cover || '',
-                      description: post.content || post.title || '',
-                    },
-                  })}
-                >
-                  <Image source={{ uri: post.media.cover }} style={styles.mediaCover} />
-                  <Text style={styles.mediaAuthor}>{post.media.title}</Text>
-                  <View style={styles.bookmarkTextContainer}>
-                    <Text style={styles.bookmarkComment} numberOfLines={3}>
-                      {post.title || post.content}
-                    </Text>
-                  </View>
-                  
-                  {/* Add X button overlay for bookmark removal */}
-                  <TouchableOpacity
-                    style={styles.bookmarkRemoveButton}
-                    onPress={(e) => {
-                      e.stopPropagation();
-                      handleRemoveBookmark(post.id, post.title || post.media.title || 'Bookmark');
-                    }}
-                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            <Text style={styles.sectionTitle}>MY BOOKSHELF</Text>
+            {loadingMedia ? (
+              <View style={styles.loadingSection}>
+                <ActivityIndicator size="small" color="#004D00" />
+                <Text style={styles.loadingSectionText}>Loading your bookshelf...</Text>
+              </View>
+            ) : mediaPreferences.length > 0 ? (
+              <HorizontalDragDropCarousel<MediaPreference>
+                items={mediaPreferences}
+                onRemove={removeMediaPreference}
+                onReorder={updateMediaPreferencesOrder}
+                getItemId={(item: MediaPreference) => item.media_id}
+                getItemTitle={(item: MediaPreference) => item.title}
+                renderItem={(item: MediaPreference, isActive: boolean) => (
+                  <TouchableOpacity 
+                    style={styles.mediaCard}
+                    onPress={() => router.push({
+                      pathname: '/media/[id]' as const,
+                      params: {
+                        id: item.media_id,
+                        title: item.title,
+                        type: item.media_type,
+                        year: item.year || '',
+                        image: item.image_url || '',
+                        description: item.description || '',
+                      },
+                    })}
+                    disabled={isActive}
                   >
-                    <View style={styles.bookmarkRemoveButtonBackground}>
-                      <Feather name="x" size={14} color="white" />
+                    <Image 
+                      source={{ uri: item.image_url || 'https://via.placeholder.com/130x180' }} 
+                      style={styles.mediaCover} 
+                    />
+                    <Text style={styles.mediaAuthor} numberOfLines={2}>{item.title}</Text>
+                  </TouchableOpacity>
+                )}
+                emptyStateMessage="No media preferences found"
+                emptyStateSubtext="Add some favorites during onboarding or in your settings"
+                removeConfirmTitle="Remove from Bookshelf"
+                removeConfirmMessage="Remove &quot;{title}&quot; from your bookshelf?"
+                removeSuccessMessage="&quot;{title}&quot; has been removed from your bookshelf."
+                loading={loadingMedia}
+              />
+            ) : (
+              <View style={styles.emptySection}>
+                <Text style={styles.emptySectionText}>No items in your bookshelf yet</Text>
+                <Text style={styles.emptySectionSubtext}>
+                  Add books, movies, and shows to personalize your profile
+                </Text>
+                <TouchableOpacity style={styles.addButton} onPress={handleAddToBookshelf}>
+                  <AntDesign name="plus" size={16} color="#004D00" />
+                  <Text style={styles.addButtonText}>Add to Bookshelf</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+
+          {/* Bookmarks Section */}
+          <View style={styles.sectionContainer}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>BOOKMARKS</Text>
+              <TouchableOpacity style={styles.sectionButton} onPress={handleBookmarksPress}>
+                <Feather name="bookmark" size={18} color="#004D00" />
+              </TouchableOpacity>
+            </View>
+            {bookmarkedPosts.length > 0 ? (
+              <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.horizontalScrollContent}
+              >
+                {bookmarkedPosts.map(item => (
+                  <TouchableOpacity 
+                    key={item.id} 
+                    style={styles.bookmarkCard}
+                    onPress={() => router.push({
+                      pathname: '/media/[id]' as const,
+                      params: {
+                        id: item.media.id,
+                        title: item.media.title,
+                        type: item.media.type,
+                        year: '',
+                        image: item.media.cover,
+                        description: '',
+                      },
+                    })}
+                  >
+                    <Image source={{ uri: item.media.cover }} style={styles.mediaCover} />
+                    <View style={styles.bookmarkTextContainer}>
+                      <Text style={styles.mediaAuthor}>{item.media.title}</Text>
+                      <Text style={styles.bookmarkComment} numberOfLines={3}>{item.title || item.content}</Text>
                     </View>
                   </TouchableOpacity>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+                ))}
+              </ScrollView>
+            ) : (
+              <View style={styles.emptySection}>
+                <Text style={styles.emptySectionText}>No bookmarks yet</Text>
+                <Text style={styles.emptySectionSubtext}>
+                  Bookmark posts and media to save them for later
+                </Text>
+              </View>
+            )}
           </View>
-        )}
 
-        {/* On Vue Section - Now with enhanced navigation and drag-and-drop */}
-        <View style={styles.sectionContainer}>
-          <Text style={styles.sectionTitle}>ON VUE</Text>
-          {loadingMedia ? (
-            <View style={styles.loadingSection}>
-              <ActivityIndicator size="small" color="#004D00" />
-              <Text style={styles.loadingSectionText}>Loading your media...</Text>
-            </View>
-          ) : (
-            <HorizontalDragDropCarousel<MediaPreference>
-              items={mediaPreferences}
-              onRemove={removeMediaPreference}
-              onReorder={updateMediaPreferencesOrder}
-              getItemId={(item: MediaPreference) => item.media_id}
-              getItemTitle={(item: MediaPreference) => item.title}
-              renderItem={(item: MediaPreference, isActive: boolean) => (
-                <TouchableOpacity 
-                  style={styles.mediaCard}
-                  onPress={() => router.push({
-                    pathname: '/media/[id]' as const,
-                    params: {
-                      id: item.media_id,
-                      title: item.title,
-                      type: item.media_type,
-                      year: item.year || '',
-                      image: item.image_url || '',
-                      description: item.description || '',
-                    },
-                  })}
-                  disabled={isActive}
-                >
-                  <Image 
-                    source={{ uri: item.image_url || 'https://via.placeholder.com/130x180' }} 
-                    style={styles.mediaCover} 
-                  />
-                  <Text style={styles.mediaAuthor} numberOfLines={2}>{item.title}</Text>
-                </TouchableOpacity>
-              )}
-              emptyStateMessage="No media preferences found"
-              emptyStateSubtext="Add some favorites during onboarding or in your settings"
-              removeConfirmTitle="Remove from On Vue"
-              removeConfirmMessage="Remove &quot;{title}&quot; from your On Vue list?"
-              removeSuccessMessage="&quot;{title}&quot; has been removed from your On Vue list."
-              loading={loadingMedia}
-            />
-          )}
-        </View>
+          {/* Favorite Vues Section - Now using real data */}
+          <View style={styles.sectionContainer}>
+            <Text style={styles.sectionTitle}>FAVORITE VUES</Text>
+            {loadingLikedPosts ? (
+              <View style={styles.loadingSection}>
+                <ActivityIndicator size="small" color="#004D00" />
+                <Text style={styles.loadingSectionText}>Loading your favorites...</Text>
+              </View>
+            ) : likedPosts.length > 0 ? (
+              <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.horizontalScrollContent}
+              >
+                {likedPosts.map(item => (
+                  <TouchableOpacity 
+                    key={item.id} 
+                    style={styles.favoriteCard}
+                    onPress={() => router.push({
+                      pathname: '/media/[id]' as const,
+                      params: {
+                        id: item.media.id,
+                        title: item.media.title,
+                        type: item.media.type,
+                        year: '',
+                        image: item.media.cover,
+                        description: '',
+                      },
+                    })}
+                  >
+                    <Image source={{ uri: item.cover }} style={styles.mediaCover} />
+                    <Text style={styles.mediaAuthor}>{item.title}</Text>
+                    <View style={styles.favoriteTextContainer}>
+                      <Text style={styles.favoriteComment}>{item.comment}</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            ) : (
+              <View style={styles.emptySection}>
+                <Text style={styles.emptySectionText}>No favorites yet</Text>
+                <Text style={styles.emptySectionSubtext}>
+                  Favorite a revue to see your saved ones!
+                </Text>
+              </View>
+            )}
+          </View>
 
-        {/* Favorite Vues Section - Now using real data */}
-        <View style={styles.sectionContainer}>
-          <Text style={styles.sectionTitle}>FAVORITE VUES</Text>
-          {loadingLikedPosts ? (
-            <View style={styles.loadingSection}>
-              <ActivityIndicator size="small" color="#004D00" />
-              <Text style={styles.loadingSectionText}>Loading your favorites...</Text>
-            </View>
-          ) : likedPosts.length > 0 ? (
-            <ScrollView 
-              horizontal 
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.horizontalScrollContent}
-            >
-              {likedPosts.map(item => (
+          {/* Recent Revues - Now using real data from feedService */}
+          <View style={styles.sectionContainer}>
+            <Text style={styles.sectionTitle}>RECENT REVUES</Text>
+            {loadingRevues ? (
+              <View style={styles.loadingSection}>
+                <ActivityIndicator size="small" color="#004D00" />
+                <Text style={styles.loadingSectionText}>Loading your revues...</Text>
+              </View>
+            ) : recentRevues.length > 0 ? (
+              recentRevues.map(post => (
                 <TouchableOpacity 
-                  key={item.id} 
-                  style={styles.favoriteCard}
-                  onPress={() => router.push({
-                    pathname: '/media/[id]' as const,
-                    params: {
-                      id: item.media.id,
-                      title: item.media.title,
-                      type: item.media.type,
-                      year: '',
-                      image: item.media.cover,
-                      description: '',
-                    },
-                  })}
+                  key={post.id} 
+                  style={styles.revueItem}
+                  onPress={() => handleRevuePress(post)}
                 >
-                  <Image source={{ uri: item.cover }} style={styles.mediaCover} />
-                  <Text style={styles.mediaAuthor}>{item.title}</Text>
-                  <View style={styles.favoriteTextContainer}>
-                    <Text style={styles.favoriteComment}>{item.comment}</Text>
+                  <TouchableOpacity 
+                    style={styles.revueImageContainer}
+                    onPress={() => handleMediaPress(post)}
+                  >
+                    <Image 
+                      source={{ uri: post.media.cover }} 
+                      style={styles.revueCover}
+                      resizeMode="cover"
+                    />
+                  </TouchableOpacity>
+                  <View style={styles.revueContent}>
+                    <Text style={styles.revueTitle}>
+                      {post.title || `${post.media.title}${post.media.progress ? `, ${post.media.progress}` : ''}`}
+                    </Text>
+                    <Text style={styles.revueText} numberOfLines={4}>
+                      {post.content}
+                    </Text>
+                    <Text style={styles.revueTime}>
+                      {formatPostDate(post.date)}
+                    </Text>
                   </View>
                 </TouchableOpacity>
-              ))}
-            </ScrollView>
-          ) : (
-            <View style={styles.emptySection}>
-              <Text style={styles.emptySectionText}>No favorites yet</Text>
-              <Text style={styles.emptySectionSubtext}>
-                Favorite a revue to see your saved ones!
-              </Text>
-            </View>
-          )}
-        </View>
-
-        {/* Recent Revues - Using mock data for now, will use userRecentReviews when posts table is ready */}
-        <View style={styles.sectionContainer}>
-          <Text style={styles.sectionTitle}>RECENT REVUES</Text>
-          {recentRevues.length > 0 ? (
-            recentRevues.map(revue => (
-              <TouchableOpacity key={revue.id} style={styles.revueItem}>
-                <View style={styles.revueImageContainer}>
-                  <Image 
-                    source={{ uri: revue.cover }} 
-                    style={styles.revueCover}
-                    resizeMode="cover"
-                  />
-                </View>
-                <View style={styles.revueContent}>
-                  <Text style={styles.revueTitle}>{revue.title}</Text>
-                  <Text style={styles.revueText} numberOfLines={4}>{revue.content}</Text>
-                  <Text style={styles.revueTime}>{revue.time}</Text>
-                </View>
-              </TouchableOpacity>
-            ))
-          ) : (
-            <View style={styles.emptySection}>
-              <Text style={styles.emptySectionText}>No recent reviews yet</Text>
-              <Text style={styles.emptySectionSubtext}>
-                Start writing reviews to see them here
-              </Text>
-            </View>
-          )}
-        </View>
-        
-        <View style={styles.spacer} />
-      </ScrollView>
+              ))
+            ) : (
+              <View style={styles.emptySection}>
+                <Text style={styles.emptySectionText}>No recent reviews yet</Text>
+                <Text style={styles.emptySectionSubtext}>
+                  Start writing reviews to see them here
+                </Text>
+                <TouchableOpacity 
+                  style={styles.addButton} 
+                  onPress={() => router.push('/(post_flow)/step1')}
+                >
+                  <AntDesign name="plus" size={16} color="#004D00" />
+                  <Text style={styles.addButtonText}>Write a Revue</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+          
+          <View style={styles.spacer} />
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 }
@@ -426,105 +452,64 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFDF6',
   },
-  headerContainer: {
-    backgroundColor: '#FFFDF6',
-    zIndex: 1,
-  },
-  scrollContent: {
-    flex: 1,
-  },
-  settingsButton: {
-    padding: 8,
-    marginRight: -8,
-  },
-  unauthenticatedContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-  },
-  unauthenticatedText: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 20,
   },
   loadingText: {
-    fontSize: 16,
-    color: '#666',
     marginTop: 16,
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-  },
-  errorText: {
     fontSize: 16,
     color: '#666',
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  retryButton: {
-    backgroundColor: '#004D00',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
-  },
-  retryButtonText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '600',
+    fontFamily: 'LibreBaskerville_700Bold',
   },
   loadingSection: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 20,
-    paddingHorizontal: 20,
+    padding: 20,
   },
   loadingSectionText: {
+    marginLeft: 10,
     fontSize: 14,
     color: '#666',
-    marginLeft: 8,
+    fontFamily: 'LibreBaskerville_400Regular',
   },
-  emptySection: {
-    paddingVertical: 20,
-    paddingHorizontal: 20,
-    alignItems: 'center',
-  },
-  emptySectionText: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 4,
-  },
-  emptySectionSubtext: {
-    fontSize: 12,
-    color: '#999',
-    textAlign: 'center',
-  },
-  profileContainer: {
-    paddingHorizontal: 20,
-    marginBottom: 20,
-  },
-  profileInfo: {
+  profileHeader: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: 10,
+    padding: 20,
+    backgroundColor: '#FFFDF6',
+  },
+  headerLeft: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  avatarContainer: {
+    marginRight: 15,
   },
   avatar: {
-    width: 85,
-    height: 85,
-    borderRadius: 42.5,
-    marginRight: 15,
-    backgroundColor: '#E1E1E1',
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+  },
+  avatarPlaceholder: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#F0F0F0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerButtons: {
+    flexDirection: 'column',
+    alignItems: 'center',
+  },
+  editButton: {
+    padding: 8,
+    backgroundColor: '#F2EFE6',
+    borderRadius: 8,
   },
   userInfo: {
     flex: 1,
@@ -538,17 +523,18 @@ const styles = StyleSheet.create({
   },
   name: {
     fontSize: 15,
-    fontWeight: 'bold',
+    fontFamily: 'LibreBaskerville_700Bold',
     marginBottom: 4,
     flex: 1,
   },
   username: {
-    fontWeight: 'normal',
+    fontFamily: 'LibreBaskerville_400Regular',
     color: '#666',
   },
   bio: {
     fontSize: 10,
     color: '#333',
+    fontFamily: 'LibreBaskerville_400Regular',
     lineHeight: 15,
     marginBottom: 7,
     maxWidth: '100%',
@@ -564,21 +550,21 @@ const styles = StyleSheet.create({
   },
   statNumber: {
     fontSize: 14,
-    fontWeight: 'bold',
+    fontFamily: 'LibreBaskerville_700Bold',
     marginRight: 4,
   },
   statLabel: {
     fontSize: 13,
     color: '#666',
+    fontFamily: 'LibreBaskerville_400Regular',
   },
   sectionContainer: {
     marginBottom: 20,
   },
   sectionTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
-    paddingHorizontal: 20,
-    marginBottom: 10,
+    fontFamily: 'LibreBaskerville_700Bold',
+    color: '#333',
   },
   horizontalScrollContent: {
     paddingLeft: 20,
@@ -598,6 +584,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
     color: '#333',
+    fontFamily: 'LibreBaskerville_400Regular',
   },
   favoriteCard: {
     width: 130,
@@ -615,6 +602,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#333',
     lineHeight: 14,
+    fontFamily: 'LibreBaskerville_400Regular',
   },
   revueItem: {
     flexDirection: 'row',
@@ -643,19 +631,21 @@ const styles = StyleSheet.create({
   },
   revueTitle: {
     fontSize: 14,
-    fontWeight: 'bold',
+    fontFamily: 'LibreBaskerville_700Bold',
     marginBottom: 5,
     height: 20,
   },
   revueText: {
     fontSize: 13,
     color: '#666',
+    fontFamily: 'LibreBaskerville_400Regular',
     lineHeight: 18,
     height: 72,
   },
   revueTime: {
     fontSize: 12,
     color: '#999',
+    fontFamily: 'LibreBaskerville_400Regular',
     marginTop: 5,
     height: 15,
   },
@@ -674,6 +664,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     lineHeight: 16,
+    fontFamily: 'LibreBaskerville_400Regular',
   },
   bookmarkButton: {
     padding: 8,
@@ -697,5 +688,114 @@ const styles = StyleSheet.create({
     backgroundColor: '#666',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  emptySection: {
+    alignItems: 'center',
+    padding: 20,
+  },
+  emptySectionText: {
+    fontSize: 16,
+    color: '#666',
+    fontFamily: 'LibreBaskerville_700Bold',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptySectionSubtext: {
+    fontSize: 14,
+    color: '#999',
+    fontFamily: 'LibreBaskerville_400Regular',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  addButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F2EFE6',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E8E8E8',
+  },
+  addButtonText: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: '#004D00',
+    fontFamily: 'LibreBaskerville_700Bold',
+  },
+  settingsButton: {
+    padding: 8,
+    backgroundColor: '#F2EFE6',
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  debugButton: {
+    padding: 8,
+    backgroundColor: '#FFF5F5',
+    borderRadius: 8,
+    marginLeft: 8,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 20,
+  },
+  sectionButton: {
+    padding: 8,
+    backgroundColor: '#F2EFE6',
+    borderRadius: 8,
+  },
+  statsText: {
+    fontSize: 16,
+    color: '#333',
+    fontFamily: 'LibreBaskerville_700Bold',
+  },
+  followingText: {
+    fontSize: 14,
+    color: '#666',
+    fontFamily: 'LibreBaskerville_400Regular',
+  },
+  displayName: {
+    fontSize: 15,
+    fontFamily: 'LibreBaskerville_700Bold',
+  },
+  handleText: {
+    color: '#666',
+    fontFamily: 'LibreBaskerville_400Regular',
+  },
+  followersText: {
+    fontSize: 10,
+    color: '#888',
+    fontFamily: 'LibreBaskerville_400Regular',
+  },
+  sectionSubtitle: {
+    fontSize: 13,
+    color: '#666',
+    fontFamily: 'LibreBaskerville_400Regular',
+  },
+  emptyText: {
+    fontSize: 12,
+    color: '#999',
+    fontFamily: 'LibreBaskerville_400Regular_Italic',
+  },
+  debugText: {
+    fontSize: 12,
+    color: '#666',
+    fontFamily: 'LibreBaskerville_400Regular',
+  },
+  buttonText: {
+    fontSize: 16,
+    color: 'white',
+    fontFamily: 'LibreBaskerville_400Regular',
+  },
+  editButtonText: {
+    fontSize: 14,
+    color: '#666',
+    fontFamily: 'LibreBaskerville_400Regular',
+  },
+  bookmarksButtonText: {
+    fontSize: 14,
+    fontFamily: 'LibreBaskerville_700Bold',
   },
 });

@@ -17,6 +17,7 @@ import KeyboardDismissWrapper from '@/components/KeyboardDismissWrapper';
 import { postService, CreatePostParams } from '@/lib/posts';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserProfile } from '@/contexts/UserProfileContext';
+import { PostDebugger } from '@/lib/postDebug';
 
 export default function Step3() {
   const params = useLocalSearchParams();
@@ -32,12 +33,101 @@ export default function Step3() {
   const [rating, setRating] = useState<number>(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Debug logging for params
+  // Debug logging for params - fix infinite re-renders
   useEffect(() => {
     if (__DEV__) {
-      console.log('📋 Step3 received params:', params);
+      // Only log when params actually change, and stringify to avoid object reference issues
+      const paramString = JSON.stringify(params);
+      console.log('📋 Step3 received params:', JSON.parse(paramString));
     }
-  }, [params]);
+  }, [JSON.stringify(params)]); // Stable dependency to prevent infinite re-renders
+
+  const handleDebugPostFlow = async () => {
+    Alert.alert(
+      'Debug Post Flow', 
+      'Choose how to debug the post creation system:',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Complete Post Flow Debug',
+          onPress: async () => {
+            console.log('🔧 Starting Complete Post Flow Debug...');
+            
+            const result = await PostDebugger.debugCompletePostFlow();
+            
+            Alert.alert(
+              'Post Debug Complete',
+              result.success 
+                ? 'Complete post flow analysis finished. Check console for detailed breakdown of database tables, permissions, and test operations.' 
+                : `Post debug failed: ${result.error}`,
+              [{ text: 'OK' }]
+            );
+          },
+        },
+        {
+          text: 'Test PostService',
+          onPress: async () => {
+            console.log('🧪 Testing PostService directly...');
+            
+            const result = await PostDebugger.testPostService();
+            
+            Alert.alert(
+              'PostService Test Complete',
+              result.success 
+                ? 'PostService test passed! Check console for details.' 
+                : `PostService test failed: ${result.error}`,
+              [{ text: 'OK' }]
+            );
+          },
+        },
+        {
+          text: 'Check Database Tables',
+          onPress: async () => {
+            console.log('📊 Checking database tables...');
+            
+            const result = await PostDebugger.testDatabaseTables();
+            
+            let message;
+            if (result.error) {
+              message = `Database check failed: ${result.error}`;
+            } else {
+              message = `Media Items: ${result.media_items?.accessible ? '✅ Accessible' : '❌ Not Accessible'}\nPosts: ${result.posts?.accessible ? '✅ Accessible' : '❌ Not Accessible'}`;
+            }
+            
+            Alert.alert(
+              'Database Tables Check',
+              message,
+              [{ text: 'OK' }]
+            );
+          },
+        },
+        {
+          text: 'Test RLS Permissions',
+          onPress: async () => {
+            console.log('🔐 Testing Row Level Security...');
+            
+            const result = await PostDebugger.checkRowLevelSecurity();
+            
+            let message;
+            if (result.error) {
+              message = `RLS check failed: ${result.error}`;
+            } else {
+              message = `Auth Token: ${result.authToken?.accessible ? '✅ Accessible' : '❌ Not Accessible'}\nAnon Key: ${result.anonKey?.accessible ? '✅ Accessible' : '❌ Not Accessible'}`;
+            }
+            
+            Alert.alert(
+              'RLS Permissions Check',
+              message,
+              [{ text: 'OK' }]
+            );
+          },
+        },
+      ]
+    );
+  };
 
   const getLocationPlaceholder = () => {
     const type = params.type as string;
@@ -114,6 +204,9 @@ export default function Step3() {
       const result = await postService.createPost(createPostParams);
 
       if (result.success) {
+        // Set global flag to refresh feed when user returns to home
+        global.shouldRefreshFeed = true;
+        
         Alert.alert(
           'Success!',
           'Your revue has been published successfully.',
@@ -221,11 +314,23 @@ export default function Step3() {
             onPress={() => router.back()}
           >
             <Ionicons name="chevron-back" size={24} color="#000" />
-            <Text style={styles.backText}>Back</Text>
+            <Text style={styles.backButtonText}>Back</Text>
           </TouchableOpacity>
 
-          <Text style={styles.headerTitle}>write a new revue</Text>
-          <Text style={styles.stepTitle}>STEP 3</Text>
+          <Text style={styles.title}>write a new revue</Text>
+          
+          <View style={styles.stepTitleContainer}>
+            <Text style={styles.stepTitle}>STEP 3</Text>
+            {__DEV__ && (
+              <TouchableOpacity
+                style={styles.debugButton}
+                onPress={handleDebugPostFlow}
+              >
+                <Ionicons name="bug-outline" size={20} color="#FF6B6B" />
+                <Text style={styles.debugButtonText}>Debug</Text>
+              </TouchableOpacity>
+            )}
+          </View>
 
           <View style={styles.mediaInfo}>
             <View style={styles.profileSection}>
@@ -385,22 +490,47 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 20,
   },
-  backText: {
+  backButtonText: {
     fontSize: 16,
-    marginLeft: 5,
+    color: '#142D0A',
+    fontFamily: 'LibreBaskerville_400Regular',
   },
-  headerTitle: {
+  title: {
     fontSize: 24,
     fontStyle: "italic",
-    textAlign: "center",
-    marginBottom: 20,
+    fontFamily: 'LibreBaskerville_400Regular_Italic',
+    color: '#142D0A',
+    textAlign: 'center',
+    marginBottom: 30,
+  },
+  stepTitleContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 40,
   },
   stepTitle: {
     fontSize: 24,
-    fontWeight: "bold",
-    color: "#2F4F4F",
+    fontFamily: 'LibreBaskerville_700Bold',
+    color: '#142D0A',
     textAlign: "center",
-    marginBottom: 40,
+  },
+  debugButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginLeft: 15,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 15,
+    backgroundColor: '#FFF5F5',
+    borderWidth: 1,
+    borderColor: '#FFE0E0',
+  },
+  debugButtonText: {
+    fontSize: 12,
+    color: "#FF6B6B",
+    marginLeft: 5,
+    fontFamily: 'LibreBaskerville_700Bold',
   },
   mediaInfo: {
     flexDirection: "row",
@@ -427,24 +557,26 @@ const styles = StyleSheet.create({
   },
   username: {
     fontSize: 14,
-    fontWeight: "500",
+    fontFamily: 'LibreBaskerville_700Bold',
   },
   revuingText: {
     fontSize: 12,
     color: "#666",
+    fontFamily: 'LibreBaskerville_400Regular',
   },
   titleSection: {
     flex: 1,
   },
   mediaTitle: {
     fontSize: 18,
-    fontWeight: "bold",
+    fontFamily: 'LibreBaskerville_700Bold',
     marginBottom: 5,
   },
   mediaCreator: {
     fontSize: 14,
     color: "#2F4F4F",
     marginBottom: 10,
+    fontFamily: 'LibreBaskerville_400Regular',
   },
   mediaDetails: {
     flexDirection: "row",
@@ -453,6 +585,7 @@ const styles = StyleSheet.create({
   mediaType: {
     fontSize: 14,
     color: "#666",
+    fontFamily: 'LibreBaskerville_400Regular',
   },
   separator: {
     marginHorizontal: 8,
@@ -467,6 +600,7 @@ const styles = StyleSheet.create({
   pageNumberText: {
     fontSize: 12,
     color: "#666",
+    fontFamily: 'LibreBaskerville_400Regular',
   },
   pageNumberInput: {
     backgroundColor: "#F2EFE6",
@@ -476,6 +610,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#2F4F4F",
     minWidth: 100,
+    fontFamily: 'LibreBaskerville_400Regular',
   },
   mediaCover: {
     width: 60,
@@ -501,6 +636,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     fontSize: 16,
     color: "#2F4F4F",
+    fontFamily: 'LibreBaskerville_400Regular',
   },
   postTitleButton: {
     flexDirection: "row",
@@ -513,9 +649,11 @@ const styles = StyleSheet.create({
   postTitleText: {
     fontSize: 16,
     color: "#666",
+    fontFamily: 'LibreBaskerville_400Regular',
   },
   filledPostTitle: {
     color: "#2F4F4F",
+    fontFamily: 'LibreBaskerville_400Regular',
   },
   ratingContainer: {
     marginBottom: 20,
@@ -524,6 +662,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: "#2F4F4F",
     marginBottom: 10,
+    fontFamily: 'LibreBaskerville_400Regular',
   },
   starsContainer: {
     flexDirection: "row",
@@ -537,12 +676,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#2F4F4F",
     marginTop: 10,
-    fontWeight: "500",
+    fontFamily: 'LibreBaskerville_700Bold',
   },
   label: {
     fontSize: 18,
     color: "#2F4F4F",
     marginBottom: 10,
+    fontFamily: 'LibreBaskerville_400Regular',
   },
   thoughtsInput: {
     backgroundColor: "#F2EFE6",
@@ -552,6 +692,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     height: 150,
     textAlignVertical: "top",
+    fontFamily: 'LibreBaskerville_400Regular',
   },
   libraryButton: {
     backgroundColor: "#F2EFE6",
@@ -563,6 +704,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#2F4F4F",
     marginBottom: 10,
+    fontFamily: 'LibreBaskerville_400Regular',
   },
   imageGrid: {
     flexDirection: "row",
@@ -596,7 +738,7 @@ const styles = StyleSheet.create({
   draftButtonText: {
     color: "#666",
     fontSize: 16,
-    fontWeight: "500",
+    fontFamily: 'LibreBaskerville_700Bold',
     marginLeft: 5,
   },
   postButton: {
@@ -614,6 +756,6 @@ const styles = StyleSheet.create({
   postButtonText: {
     color: "white",
     fontSize: 16,
-    fontWeight: "600",
+    fontFamily: 'LibreBaskerville_700Bold',
   },
 });

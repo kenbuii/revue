@@ -180,6 +180,7 @@ const styles = StyleSheet.create({
   emptyStateTitle: {
     fontSize: 20,
     fontWeight: '600',
+    fontFamily: 'LibreBaskerville_700Bold',
     color: '#333',
     marginBottom: 8,
     textAlign: 'center',
@@ -187,6 +188,7 @@ const styles = StyleSheet.create({
   emptyStateSubtitle: {
     fontSize: 14,
     color: '#666',
+    fontFamily: 'LibreBaskerville_400Regular',
     textAlign: 'center',
     lineHeight: 20,
   },
@@ -197,6 +199,7 @@ const styles = StyleSheet.create({
   bookmarksCount: {
     fontSize: 16,
     fontWeight: '600',
+    fontFamily: 'LibreBaskerville_700Bold',
     color: '#333',
     marginBottom: 20,
   },

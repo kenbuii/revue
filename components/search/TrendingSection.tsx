@@ -152,13 +152,19 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 16,
-    fontWeight: '700',
-    color: '#004D00',
-    marginBottom: 2,
+    fontFamily: 'LibreBaskerville_700Bold',
+    color: '#333',
+    marginBottom: 10,
+  },
+  sectionSubtitle: {
+    fontSize: 13,
+    color: '#666',
+    fontFamily: 'LibreBaskerville_400Regular',
   },
   postCount: {
     fontSize: 13,
     color: '#666',
+    fontFamily: 'LibreBaskerville_400Regular',
   },
   headerImage: {
     width: 50,
@@ -222,7 +228,7 @@ const styles = StyleSheet.create({
   ratingText: {
     color: 'white',
     fontSize: 10,
-    fontWeight: '600',
+    fontFamily: 'LibreBaskerville_700Bold',
     marginLeft: 2,
   },
   itemInfo: {
@@ -230,7 +236,7 @@ const styles = StyleSheet.create({
   },
   itemTitle: {
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: 'LibreBaskerville_700Bold',
     color: '#333',
     marginBottom: 4,
     lineHeight: 16,
@@ -277,7 +283,7 @@ const styles = StyleSheet.create({
   nytIndicatorText: {
     color: 'white',
     fontSize: 9,
-    fontWeight: '600',
+    fontFamily: 'LibreBaskerville_700Bold',
   },
   nytBadge: {
     position: 'absolute',
@@ -291,12 +297,69 @@ const styles = StyleSheet.create({
   nytBadgeText: {
     color: 'white',
     fontSize: 8,
-    fontWeight: '700',
+    fontFamily: 'LibreBaskerville_700Bold',
   },
   bestsellerText: {
     fontSize: 8,
     color: '#004D00',
-    fontWeight: '600',
+    fontFamily: 'LibreBaskerville_700Bold',
     marginTop: 2,
+  },
+  emptyMessage: {
+    fontSize: 32,
+    color: '#ccc',
+    fontFamily: 'LibreBaskerville_400Regular_Italic',
+    textAlign: 'center',
+    marginTop: 100,
+  },
+  bookTitle: {
+    fontSize: 10,
+    fontFamily: 'LibreBaskerville_700Bold',
+    color: '#333',
+    textAlign: 'center',
+    marginBottom: 2,
+  },
+  bookAuthor: {
+    fontSize: 12,
+    fontFamily: 'LibreBaskerville_700Bold',
+    color: '#666',
+    textAlign: 'center',
+  },
+  movieTitle: {
+    fontSize: 10,
+    color: '#333',
+    fontFamily: 'LibreBaskerville_400Regular',
+    textAlign: 'center',
+    marginBottom: 2,
+  },
+  movieYear: {
+    fontSize: 10,
+    color: '#666',
+    fontFamily: 'LibreBaskerville_400Regular',
+    textAlign: 'center',
+  },
+  movieRating: {
+    fontSize: 9,
+    color: '#FFD700',
+    fontStyle: 'italic',
+    fontFamily: 'LibreBaskerville_400Regular_Italic',
+    textAlign: 'center',
+    marginTop: 2,
+  },
+  listName: {
+    fontSize: 9,
+    fontFamily: 'LibreBaskerville_700Bold',
+    color: '#fff',
+    textAlign: 'center',
+  },
+  tagText: {
+    fontSize: 8,
+    fontFamily: 'LibreBaskerville_700Bold',
+    color: 'white',
+  },
+  rankBadgeText: {
+    fontSize: 8,
+    color: '#333',
+    fontFamily: 'LibreBaskerville_700Bold',
   },
 }); 

@@ -291,16 +291,18 @@ const styles = StyleSheet.create({
   backText: {
     fontSize: 16,
     marginLeft: 5,
+    fontFamily: 'LibreBaskerville_400Regular',
   },
   headerTitle: {
     fontSize: 24,
     fontStyle: "italic",
+    fontFamily: 'LibreBaskerville_400Regular_Italic',
     textAlign: "center",
     marginBottom: 20,
   },
   stepTitle: {
     fontSize: 24,
-    fontWeight: "bold",
+    fontFamily: 'LibreBaskerville_700Bold',
     color: "#2F4F4F",
     textAlign: "center",
     marginBottom: 10,
@@ -310,11 +312,13 @@ const styles = StyleSheet.create({
     color: "#666",
     textAlign: "center",
     marginBottom: 40,
+    fontFamily: 'LibreBaskerville_400Regular',
   },
   label: {
     fontSize: 18,
     color: "#2F4F4F",
     marginBottom: 10,
+    fontFamily: 'LibreBaskerville_400Regular',
   },
   input: {
     backgroundColor: "#F2EFE6",
@@ -324,6 +328,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     borderWidth: 1,
     borderColor: "#E8E4D8",
+    fontFamily: 'LibreBaskerville_400Regular',
   },
   placeholderImage: {
     backgroundColor: "#F2EFE6",
@@ -339,12 +344,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#2F4F4F",
     marginTop: 10,
-    fontWeight: "500",
+    fontFamily: 'LibreBaskerville_700Bold',
   },
   placeholderSubtext: {
     fontSize: 12,
     color: "#666",
     marginTop: 4,
+    fontFamily: 'LibreBaskerville_400Regular',
   },
   pickerButton: {
     backgroundColor: "#F2EFE6",
@@ -360,6 +366,7 @@ const styles = StyleSheet.create({
   pickerText: {
     fontSize: 16,
     color: "#2F4F4F",
+    fontFamily: 'LibreBaskerville_400Regular',
   },
   nextButton: {
     backgroundColor: "#2F4F4F",
@@ -371,7 +378,7 @@ const styles = StyleSheet.create({
   nextButtonText: {
     color: "white",
     fontSize: 16,
-    fontWeight: "600",
+    fontFamily: 'LibreBaskerville_700Bold',
   },
   modalOverlay: {
     flex: 1,
@@ -394,7 +401,7 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: "600",
+    fontFamily: 'LibreBaskerville_700Bold',
     color: "#2F4F4F",
   },
   closeButton: {
@@ -411,8 +418,9 @@ const styles = StyleSheet.create({
   optionText: {
     fontSize: 16,
     color: "#2F4F4F",
+    fontFamily: 'LibreBaskerville_400Regular',
   },
   selectedOptionText: {
-    fontWeight: "600",
+    fontFamily: 'LibreBaskerville_700Bold',
   },
 });

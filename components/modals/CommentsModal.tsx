@@ -4,69 +4,63 @@ import {
   View,
   Text,
   TouchableOpacity,
-  ScrollView,
   StyleSheet,
-  Image,
-  TextInput,
+  SafeAreaView,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-
-interface Comment {
-  id: string;
-  user: { name: string; avatar: string };
-  content: string;
-  timestamp: string;
-  likeCount: number;
-  isLiked: boolean;
-}
+import CommentsList from '@/components/comments/CommentsList';
+import CommentInput from '@/components/comments/CommentInput';
 
 interface CommentsModalProps {
   visible: boolean;
   onClose: () => void;
-  comments: Comment[];
   postId: string;
+  initialCommentCount?: number;
 }
 
-function CommentItem({ comment }: { comment: Comment }) {
-  const [isLiked, setIsLiked] = useState(comment.isLiked);
-  const [likeCount, setLikeCount] = useState(comment.likeCount);
+export default function CommentsModal({
+  visible,
+  onClose,
+  postId,
+  initialCommentCount = 0
+}: CommentsModalProps) {
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [commentCount, setCommentCount] = useState(initialCommentCount);
 
-  const handleLike = () => {
-    setIsLiked(!isLiked);
-    setLikeCount(prev => isLiked ? prev - 1 : prev + 1);
+  // Handle when a new comment is posted
+  const handleCommentPosted = () => {
+    console.log('✅ New comment posted, refreshing list...');
+    
+    // Trigger refresh of comments list
+    setRefreshTrigger(prev => prev + 1);
+    
+    // Update comment count optimistically
+    setCommentCount(prev => prev + 1);
   };
 
-  return (
-    <View style={styles.commentItem}>
-      <Image source={{ uri: comment.user.avatar }} style={styles.commentAvatar} />
-      <View style={styles.commentContent}>
-        <View style={styles.commentHeader}>
-          <Text style={styles.commentUsername}>{comment.user.name}</Text>
-          <Text style={styles.commentTimestamp}>{comment.timestamp}</Text>
-        </View>
-        <Text style={styles.commentText}>{comment.content}</Text>
-        <TouchableOpacity style={styles.likeButton} onPress={handleLike}>
-          <Ionicons 
-            name={isLiked ? "heart" : "heart-outline"} 
-            size={16} 
-            color={isLiked ? "#FF6B6B" : "#666"} 
-          />
-          <Text style={styles.likeCount}>{likeCount}</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-}
+  // Handle comment like updates
+  const handleCommentLike = (commentId: string, isLiked: boolean) => {
+    console.log(`💖 Comment ${commentId} ${isLiked ? 'liked' : 'unliked'}`);
+    // Comment like state is handled by CommentItem and CommentsList
+  };
 
-export default function CommentsModal({ visible, onClose, comments, postId }: CommentsModalProps) {
-  const [newComment, setNewComment] = useState('');
+  // Handle comment replies (for future implementation)
+  const handleCommentReply = (commentId: string) => {
+    console.log('💬 Reply to comment:', commentId);
+    // TODO: Implement reply functionality in future phase
+  };
 
-  const handleSubmitComment = () => {
-    if (newComment.trim()) {
-      console.log('Submitting comment:', newComment, 'for post:', postId);
-      setNewComment('');
-      // TODO: Add comment to post
-    }
+  // Handle comment deletion (for future implementation)
+  const handleCommentDelete = (commentId: string) => {
+    console.log('🗑️ Delete comment:', commentId);
+    // Update comment count
+    setCommentCount(prev => Math.max(0, prev - 1));
+  };
+
+  const handleClose = () => {
+    onClose();
   };
 
   return (
@@ -74,50 +68,56 @@ export default function CommentsModal({ visible, onClose, comments, postId }: Co
       visible={visible}
       animationType="slide"
       presentationStyle="pageSheet"
-      onRequestClose={onClose}
+      onRequestClose={handleClose}
     >
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Comments</Text>
-          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-            <Ionicons name="close" size={24} color="#000" />
-          </TouchableOpacity>
-        </View>
-
-        <ScrollView style={styles.commentsContainer}>
-          {comments.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyText}>No comments yet</Text>
-              <Text style={styles.emptySubtext}>Be the first to comment!</Text>
+      <SafeAreaView style={styles.container}>
+        <KeyboardAvoidingView 
+          style={styles.keyboardContainer}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+        >
+          {/* Header */}
+          <View style={styles.header}>
+            <View style={styles.headerLeft}>
+              <Text style={styles.title}>Comments</Text>
+              {commentCount > 0 && (
+                <Text style={styles.commentCount}>({commentCount})</Text>
+              )}
             </View>
-          ) : (
-            comments.map(comment => (
-              <CommentItem key={comment.id} comment={comment} />
-            ))
-          )}
-        </ScrollView>
-
-        <View style={styles.inputContainer}>
-          <Image source={{ uri: 'https://via.placeholder.com/40' }} style={styles.userAvatar} />
-          <View style={styles.inputWrapper}>
-            <TextInput
-              style={styles.textInput}
-              placeholder="Add a comment..."
-              value={newComment}
-              onChangeText={setNewComment}
-              multiline
-              maxLength={500}
-            />
+            
             <TouchableOpacity 
-              style={[styles.submitButton, !newComment.trim() && styles.submitButtonDisabled]}
-              onPress={handleSubmitComment}
-              disabled={!newComment.trim()}
+              onPress={handleClose}
+              style={styles.closeButton}
+              activeOpacity={0.7}
             >
-              <Text style={styles.submitButtonText}>Post</Text>
+              <Ionicons name="close" size={24} color="#000" />
             </TouchableOpacity>
           </View>
-        </View>
-      </View>
+
+          {/* Comments List */}
+          <View style={styles.commentsContainer}>
+            <CommentsList
+              postId={postId}
+              refreshTrigger={refreshTrigger}
+              onCommentLike={handleCommentLike}
+              onCommentReply={handleCommentReply}
+              onCommentDelete={handleCommentDelete}
+              showReplyButtons={false} // Disable replies for now
+              showDeleteButtons={false} // Disable deletion for now
+              emptyStateMessage="No comments yet. Be the first to share your thoughts!"
+            />
+          </View>
+
+          {/* Comment Input */}
+          <CommentInput
+            postId={postId}
+            onCommentPosted={handleCommentPosted}
+            placeholder="Write a comment..."
+            autoFocus={false}
+            maxLength={500}
+          />
+        </KeyboardAvoidingView>
+      </SafeAreaView>
     </Modal>
   );
 }
@@ -125,121 +125,43 @@ export default function CommentsModal({ visible, onClose, comments, postId }: Co
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFDF6',
+    backgroundColor: '#FFFFFF',
+  },
+  keyboardContainer: {
+    flex: 1,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#E8E8E8',
+    backgroundColor: '#FFFFFF',
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   title: {
     fontSize: 18,
     fontWeight: '600',
+    color: '#000',
+    fontFamily: 'LibreBaskerville_700Bold',
+  },
+  commentCount: {
+    fontSize: 16,
+    color: '#666',
+    marginLeft: 8,
+    fontWeight: '400',
   },
   closeButton: {
-    padding: 8,
+    padding: 4,
+    borderRadius: 20,
   },
   commentsContainer: {
     flex: 1,
-    padding: 16,
-  },
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 60,
-  },
-  emptyText: {
-    fontSize: 18,
-    fontWeight: '500',
-    color: '#666',
-    marginBottom: 8,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: '#999',
-  },
-  commentItem: {
-    flexDirection: 'row',
-    marginBottom: 16,
-  },
-  commentAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 12,
-  },
-  commentContent: {
-    flex: 1,
-  },
-  commentHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  commentUsername: {
-    fontWeight: '600',
-    marginRight: 8,
-  },
-  commentTimestamp: {
-    color: '#666',
-    fontSize: 12,
-  },
-  commentText: {
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 8,
-  },
-  likeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  likeCount: {
-    color: '#666',
-    fontSize: 12,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#E8E8E8',
-    backgroundColor: '#FFFDF6',
-  },
-  userAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 12,
-  },
-  inputWrapper: {
-    flex: 1,
-  },
-  textInput: {
-    borderWidth: 1,
-    borderColor: '#E8E8E8',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
-    maxHeight: 100,
-    marginBottom: 8,
-  },
-  submitButton: {
-    backgroundColor: '#004D00',
-    borderRadius: 20,
-    paddingVertical: 8,
-    paddingHorizontal: 20,
-    alignSelf: 'flex-end',
-  },
-  submitButtonDisabled: {
-    backgroundColor: '#CCCCCC',
-  },
-  submitButtonText: {
-    color: 'white',
-    fontWeight: '600',
+    backgroundColor: '#FFFFFF',
   },
 }); 

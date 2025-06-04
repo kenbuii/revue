@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, Image, TouchableOpacity, Alert, StyleSheet, FlatList } from 'react-native';
+import { View, Image, TouchableOpacity, Alert, StyleSheet, FlatList } from 'react-native';
 import DraggableFlatList, { RenderItemParams, ScaleDecorator } from 'react-native-draggable-flatlist';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { MediaPreference } from '@/lib/userProfile';
+import CustomText from './CustomText';
 
 interface DraggableMediaListProps {
   mediaPreferences: MediaPreference[];
@@ -147,13 +148,13 @@ export default function DraggableMediaList({
               source={{ uri: item.image_url || 'https://via.placeholder.com/130x180' }} 
               style={styles.mediaCover} 
             />
-            <Text style={styles.mediaTitle} numberOfLines={2}>{item.title}</Text>
+            <CustomText style={styles.mediaTitle} numberOfLines={2}>{item.title}</CustomText>
           </TouchableOpacity>
 
           {/* Loading overlay */}
           {isReordering && (
             <View style={styles.loadingOverlay}>
-              <Text style={styles.loadingText}>Saving...</Text>
+              <CustomText weight="bold" style={styles.loadingText}>Saving...</CustomText>
             </View>
           )}
         </View>
@@ -165,10 +166,10 @@ export default function DraggableMediaList({
     console.log('🔴 DraggableMediaList showing empty state - data length is 0');
     return (
       <View style={styles.emptySection}>
-        <Text style={styles.emptySectionText}>No media preferences found</Text>
-        <Text style={styles.emptySectionSubtext}>
+        <CustomText weight="bold" style={styles.emptySectionText}>No media preferences found</CustomText>
+        <CustomText style={styles.emptySectionSubtext}>
           Add some favorites during onboarding or in your settings
-        </Text>
+        </CustomText>
       </View>
     );
   }
@@ -179,9 +180,9 @@ export default function DraggableMediaList({
   return (
     <View style={styles.container}>
       {data.length > 0 && (
-        <Text style={styles.instructionText}>
+        <CustomText weight="bold" style={styles.instructionText}>
           Tap and hold ⋮⋮⋮ to reorder • Tap ✕ to remove
-        </Text>
+        </CustomText>
       )}
       
       {/* DEBUG: Test with regular FlatList */}
@@ -193,7 +194,7 @@ export default function DraggableMediaList({
               source={{ uri: item.image_url || 'https://via.placeholder.com/130x180' }} 
               style={styles.mediaCover} 
             />
-            <Text style={styles.mediaTitle} numberOfLines={2}>{item.title}</Text>
+            <CustomText style={styles.mediaTitle} numberOfLines={2}>{item.title}</CustomText>
           </View>
         )}
         keyExtractor={(item) => `test_${item.media_id}`}
@@ -267,7 +268,7 @@ const styles = StyleSheet.create({
   },
   mediaTitle: {
     fontSize: 12,
-    fontWeight: '500',
+    fontFamily: 'LibreBaskerville_400Regular',
     color: '#333',
     marginTop: 8,
     textAlign: 'center',
@@ -287,7 +288,7 @@ const styles = StyleSheet.create({
   loadingText: {
     color: 'white',
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: 'LibreBaskerville_700Bold',
   },
   emptySection: {
     paddingVertical: 40,
@@ -296,18 +297,19 @@ const styles = StyleSheet.create({
   },
   emptySectionText: {
     fontSize: 14,
-    fontWeight: '500',
+    fontFamily: 'LibreBaskerville_700Bold',
     color: '#666',
     marginBottom: 4,
   },
   emptySectionSubtext: {
     fontSize: 12,
+    fontFamily: 'LibreBaskerville_400Regular',
     color: '#999',
     textAlign: 'center',
   },
   instructionText: {
     fontSize: 12,
-    fontWeight: '500',
+    fontFamily: 'LibreBaskerville_700Bold',
     color: '#666',
     marginBottom: 8,
     textAlign: 'center',

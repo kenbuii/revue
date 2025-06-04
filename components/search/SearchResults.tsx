@@ -156,6 +156,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
     fontSize: 16,
     color: '#666',
+    fontFamily: 'LibreBaskerville_400Regular',
   },
   emptyContainer: {
     flex: 1,
@@ -166,7 +167,7 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontFamily: 'LibreBaskerville_700Bold',
     color: '#333',
     marginTop: 16,
     textAlign: 'center',
@@ -176,6 +177,7 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
     marginTop: 8,
+    fontFamily: 'LibreBaskerville_400Regular',
   },
   resultsContainer: {
     flex: 1,
@@ -183,7 +185,7 @@ const styles = StyleSheet.create({
   },
   resultsHeader: {
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: 'LibreBaskerville_700Bold',
     color: '#333',
     marginBottom: 20,
   },
@@ -192,7 +194,7 @@ const styles = StyleSheet.create({
   },
   categoryTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontFamily: 'LibreBaskerville_700Bold',
     color: '#004D00',
     marginBottom: 12,
   },
@@ -229,7 +231,7 @@ const styles = StyleSheet.create({
   },
   resultTitle: {
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: 'LibreBaskerville_700Bold',
     color: '#333',
     marginBottom: 4,
   },
@@ -249,7 +251,7 @@ const styles = StyleSheet.create({
   typeTagText: {
     color: 'white',
     fontSize: 10,
-    fontWeight: '600',
+    fontFamily: 'LibreBaskerville_700Bold',
     textTransform: 'uppercase',
   },
   resultYear: {
@@ -257,6 +259,7 @@ const styles = StyleSheet.create({
     color: '#666',
     marginRight: 8,
     marginBottom: 4,
+    fontFamily: 'LibreBaskerville_400Regular',
   },
   ratingContainer: {
     flexDirection: 'row',
@@ -267,16 +270,83 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     marginLeft: 2,
+    fontFamily: 'LibreBaskerville_400Regular',
   },
   resultAuthor: {
     fontSize: 12,
     color: '#666',
     fontStyle: 'italic',
     marginBottom: 4,
+    fontFamily: 'LibreBaskerville_400Regular_Italic',
   },
   resultDescription: {
     fontSize: 12,
     color: '#666',
     lineHeight: 16,
+    fontFamily: 'LibreBaskerville_400Regular',
+  },
+  noResultsText: {
+    fontSize: 16,
+    color: '#666',
+    fontFamily: 'LibreBaskerville_400Regular',
+    textAlign: 'center',
+    marginTop: 50,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontFamily: 'LibreBaskerville_700Bold',
+    color: '#333',
+    marginBottom: 15,
+  },
+  movieTitle: {
+    fontSize: 18,
+    fontFamily: 'LibreBaskerville_700Bold',
+    color: '#333',
+    marginBottom: 4,
+  },
+  movieYear: {
+    fontSize: 16,
+    fontFamily: 'LibreBaskerville_700Bold',
+    color: '#666',
+    marginBottom: 8,
+  },
+  bookTitle: {
+    fontSize: 16,
+    fontFamily: 'LibreBaskerville_700Bold',
+    color: '#333',
+    marginBottom: 4,
+  },
+  bookAuthor: {
+    fontSize: 14,
+    color: '#666',
+    fontFamily: 'LibreBaskerville_400Regular',
+    marginBottom: 4,
+  },
+  categoryText: {
+    fontSize: 10,
+    fontFamily: 'LibreBaskerville_700Bold',
+    color: 'white',
+    textTransform: 'uppercase',
+  },
+  listText: {
+    fontSize: 12,
+    color: '#666',
+    fontFamily: 'LibreBaskerville_400Regular',
+  },
+  publishedText: {
+    fontSize: 12,
+    color: '#999',
+    fontFamily: 'LibreBaskerville_400Regular',
+  },
+  rankText: {
+    fontSize: 12,
+    color: '#FFD700',
+    fontStyle: 'italic',
+    fontFamily: 'LibreBaskerville_400Regular_Italic',
+  },
+  descriptionText: {
+    fontSize: 12,
+    color: '#777',
+    fontFamily: 'LibreBaskerville_400Regular',
   },
 }); 

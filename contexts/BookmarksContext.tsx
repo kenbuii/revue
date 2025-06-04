@@ -10,6 +10,7 @@ interface BookmarksContextType {
   toggleBookmark: (post: Post) => Promise<boolean>; // Returns new bookmark state
   loading: boolean;
   refreshBookmarks: () => Promise<void>;
+  error: string | null;
 }
 
 const BookmarksContext = createContext<BookmarksContextType | undefined>(undefined);
@@ -17,7 +18,18 @@ const BookmarksContext = createContext<BookmarksContextType | undefined>(undefin
 export function BookmarksProvider({ children }: { children: ReactNode }) {
   const [bookmarkedPosts, setBookmarkedPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(false);
-  const { isAuthenticated, user } = useAuth();
+  const [error, setError] = useState<string | null>(null);
+  
+  // Safely get auth state with error handling
+  let authState;
+  try {
+    authState = useAuth();
+  } catch (error) {
+    console.error('BookmarksContext: Error accessing auth state:', error);
+    authState = { isAuthenticated: false, user: null };
+  }
+  
+  const { isAuthenticated, user } = authState;
 
   // Load bookmarks on mount and when auth state changes
   useEffect(() => {
@@ -26,33 +38,36 @@ export function BookmarksProvider({ children }: { children: ReactNode }) {
 
   const loadBookmarks = async () => {
     setLoading(true);
+    setError(null);
+    
     try {
       if (isAuthenticated && user) {
-        console.log('🔖 Loading bookmarks from Supabase...');
+        console.log('Loading bookmarks from Supabase...');
         // Try to load from Supabase first
         try {
           const supabaseBookmarks = await bookmarkService.getUserBookmarks();
-          setBookmarkedPosts(supabaseBookmarks);
+          setBookmarkedPosts(supabaseBookmarks || []);
           
           // Save to local storage as backup
-          await bookmarkService.saveBookmarksLocally(supabaseBookmarks);
-          console.log('✅ Bookmarks loaded from Supabase:', supabaseBookmarks.length);
+          await bookmarkService.saveBookmarksLocally(supabaseBookmarks || []);
+          console.log('Bookmarks loaded from Supabase');
         } catch (error) {
-          console.error('❌ Failed to load from Supabase, falling back to local storage:', error);
+          console.error('Failed to load from Supabase, using local storage');
           // Fallback to local storage
           const localBookmarks = await bookmarkService.getBookmarksLocally();
-          setBookmarkedPosts(localBookmarks);
-          console.log('✅ Bookmarks loaded from local storage:', localBookmarks.length);
+          setBookmarkedPosts(localBookmarks || []);
+          console.log('Bookmarks loaded from local storage');
         }
       } else {
-        console.log('🔖 Loading bookmarks from local storage (not authenticated)...');
+        console.log('Loading bookmarks from local storage...');
         // Not authenticated, use local storage only
         const localBookmarks = await bookmarkService.getBookmarksLocally();
-        setBookmarkedPosts(localBookmarks);
-        console.log('✅ Bookmarks loaded from local storage:', localBookmarks.length);
+        setBookmarkedPosts(localBookmarks || []);
+        console.log('Bookmarks loaded from local storage');
       }
     } catch (error) {
-      console.error('❌ Error loading bookmarks:', error);
+      console.error('Error loading bookmarks:', error);
+      setError('Failed to load bookmarks');
       setBookmarkedPosts([]);
     } finally {
       setLoading(false);
@@ -65,11 +80,11 @@ export function BookmarksProvider({ children }: { children: ReactNode }) {
 
   const addBookmark = async (post: Post) => {
     try {
-      console.log('🔖 Adding bookmark:', post.id);
+      console.log('Adding bookmark:', post?.id || 'unknown');
       
       // Check if already bookmarked
       if (bookmarkedPosts.some(p => p.id === post.id)) {
-        console.log('⚠️ Post already bookmarked:', post.id);
+        console.log('Post already bookmarked');
         return;
       }
 
@@ -85,14 +100,14 @@ export function BookmarksProvider({ children }: { children: ReactNode }) {
       if (isAuthenticated && user) {
         try {
           await bookmarkService.addBookmark(post);
-          console.log('✅ Bookmark saved to Supabase');
+          console.log('Bookmark saved to Supabase');
         } catch (error) {
-          console.error('❌ Failed to save bookmark to Supabase:', error);
+          console.error('Failed to save bookmark to Supabase');
           // The bookmark is still saved locally, so it will sync later
         }
       }
     } catch (error) {
-      console.error('❌ Error adding bookmark:', error);
+      console.error('Error adding bookmark:', error);
       // Revert local state if something went wrong
       setBookmarkedPosts(prev => prev.filter(p => p.id !== post.id));
     }
@@ -100,7 +115,7 @@ export function BookmarksProvider({ children }: { children: ReactNode }) {
 
   const removeBookmark = async (postId: string) => {
     try {
-      console.log('🔖 Removing bookmark:', postId);
+      console.log('Removing bookmark:', postId || 'unknown');
 
       // Update local state immediately
       const updatedBookmarks = bookmarkedPosts.filter(post => post.id !== postId);
@@ -113,32 +128,42 @@ export function BookmarksProvider({ children }: { children: ReactNode }) {
       if (isAuthenticated && user) {
         try {
           await bookmarkService.removeBookmark(postId);
-          console.log('✅ Bookmark removed from Supabase');
+          console.log('Bookmark removed from Supabase');
         } catch (error) {
-          console.error('❌ Failed to remove bookmark from Supabase:', error);
+          console.error('Failed to remove bookmark from Supabase');
           // The bookmark is still removed locally
         }
       }
     } catch (error) {
-      console.error('❌ Error removing bookmark:', error);
+      console.error('Error removing bookmark:', error);
       // Revert local state if something went wrong
       await loadBookmarks();
     }
   };
 
   const isBookmarked = (postId: string) => {
-    return bookmarkedPosts.some(post => post.id === postId);
+    try {
+      return bookmarkedPosts.some(post => post.id === postId);
+    } catch (error) {
+      console.error('Error checking bookmark status:', error);
+      return false;
+    }
   };
 
   const toggleBookmark = async (post: Post): Promise<boolean> => {
-    const currentlyBookmarked = isBookmarked(post.id);
-    
-    if (currentlyBookmarked) {
-      await removeBookmark(post.id);
+    try {
+      const currentlyBookmarked = isBookmarked(post.id);
+      
+      if (currentlyBookmarked) {
+        await removeBookmark(post.id);
+        return false;
+      } else {
+        await addBookmark(post);
+        return true;
+      }
+    } catch (error) {
+      console.error('Error toggling bookmark:', error);
       return false;
-    } else {
-      await addBookmark(post);
-      return true;
     }
   };
 
@@ -147,12 +172,12 @@ export function BookmarksProvider({ children }: { children: ReactNode }) {
     if (isAuthenticated && user) {
       const syncBookmarks = async () => {
         try {
-          console.log('🔄 Syncing local bookmarks to Supabase...');
+          console.log('Syncing local bookmarks to Supabase...');
           await bookmarkService.syncLocalBookmarksToSupabase();
           // Refresh bookmarks after sync
           await loadBookmarks();
         } catch (error) {
-          console.error('❌ Error syncing bookmarks:', error);
+          console.error('Error syncing bookmarks:', error);
         }
       };
       
@@ -161,13 +186,14 @@ export function BookmarksProvider({ children }: { children: ReactNode }) {
   }, [isAuthenticated, user]);
 
   const value: BookmarksContextType = {
-    bookmarkedPosts,
+    bookmarkedPosts: bookmarkedPosts || [],
     addBookmark,
     removeBookmark,
     isBookmarked,
     toggleBookmark,
     loading,
     refreshBookmarks,
+    error,
   };
 
   return (

@@ -9,7 +9,11 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { AuthProvider } from '@/contexts/AuthContext';
+import { NotificationsProvider } from '@/contexts/NotificationsContext';
 import { BookmarksProvider } from '@/contexts/BookmarksContext';
+import { PostInteractionsProvider } from '@/contexts/PostInteractionsContext';
+import { CommentsProvider } from '@/contexts/CommentsContext';
+import { HiddenPostsProvider } from '@/contexts/HiddenPostsContext';
 import { FavoritesProvider } from '@/contexts/FavoritesContext';
 import { UserProfileProvider } from '@/contexts/UserProfileContext';
 
@@ -38,31 +42,39 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AuthProvider>
+        <NotificationsProvider>
         <UserProfileProvider>
           <BookmarksProvider>
-            <FavoritesProvider>
-              <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-                <Stack>
-                  <Stack.Screen name="onboarding_flow" options={{ headerShown: false }} />
-                  <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                  <Stack.Screen name="(post_flow)" options={{ headerShown: false }} />
-                  <Stack.Screen name="post" options={{ headerShown: false }} />
-                  <Stack.Screen 
-                    name="media" 
-                    options={{ 
-                      headerShown: false,
-                      presentation: 'modal'
-                    }} 
-                  />
-                  <Stack.Screen name="settings" options={{ headerShown: false }} />
-                  <Stack.Screen name="bookmarks" options={{ headerShown: false }} />
-                  <Stack.Screen name="+not-found" />
-                </Stack>
-                <StatusBar style="auto" />
-              </ThemeProvider>
-            </FavoritesProvider>
+            <PostInteractionsProvider>
+              <CommentsProvider>
+                <HiddenPostsProvider>
+                  <FavoritesProvider>
+                    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+                      <Stack>
+                        <Stack.Screen name="onboarding_flow" options={{ headerShown: false }} />
+                        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                        <Stack.Screen name="(post_flow)" options={{ headerShown: false }} />
+                        <Stack.Screen name="post" options={{ headerShown: false }} />
+                        <Stack.Screen 
+                          name="media" 
+                          options={{ 
+                            headerShown: false,
+                            presentation: 'modal'
+                          }} 
+                        />
+                        <Stack.Screen name="settings" options={{ headerShown: false }} />
+                        <Stack.Screen name="bookmarks" options={{ headerShown: false }} />
+                        <Stack.Screen name="+not-found" />
+                      </Stack>
+                      <StatusBar style="auto" />
+                    </ThemeProvider>
+                  </FavoritesProvider>
+                </HiddenPostsProvider>
+              </CommentsProvider>
+            </PostInteractionsProvider>
           </BookmarksProvider>
         </UserProfileProvider>
+        </NotificationsProvider>
       </AuthProvider>
     </GestureHandlerRootView>
   );

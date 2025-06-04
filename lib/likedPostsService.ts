@@ -1,4 +1,5 @@
 import { supabaseAuth } from './supabase';
+import { likesService } from './likesService';
 
 export interface LikedPost {
   id: string;
@@ -74,7 +75,7 @@ class LikedPostsService {
 
   /**
    * Fetch user's liked posts/revues
-   * TODO: This will be updated when posts and likes tables are implemented
+   * Updated to use the new likesService functionality
    */
   async getUserLikedPosts(userId?: string): Promise<LikedPost[]> {
     try {
@@ -88,58 +89,62 @@ class LikedPostsService {
         return [];
       }
 
-      // TODO: When posts and likes tables are ready, replace this with:
-      /*
+      // Get posts with user likes using direct SQL query
       const likedPosts = await this.makeSupabaseRequest(
-        `posts_likes?user_id=eq.${targetUserId}&select=*,posts:post_id(id,title,content,media_id,media_title,media_type,media_cover,user_profiles:user_id(display_name,avatar_url))`
+        `post_likes?select=*,posts!inner(id,title,content,media_id,user_id,created_at,user_profiles!inner(display_name,avatar_url),media_items!inner(title,media_type,image_url))&user_id=eq.${targetUserId}&order=created_at.desc`
       );
+
+      if (!likedPosts || !Array.isArray(likedPosts)) {
+        console.log('⚠️ No liked posts found');
+        return [];
+      }
+
+      console.log(`✅ Found ${likedPosts.length} liked posts`);
       
-      return likedPosts?.map((like: any) => ({
+      return likedPosts.map((like: any) => ({
         id: like.posts.id,
-        title: like.posts.media_title,
-        cover: like.posts.media_cover,
+        title: like.posts.media_items.title,
+        cover: like.posts.media_items.image_url || 'https://via.placeholder.com/120x160',
         comment: like.posts.content,
         media: {
           id: like.posts.media_id,
-          title: like.posts.media_title,
-          type: like.posts.media_type,
-          cover: like.posts.media_cover,
+          title: like.posts.media_items.title,
+          type: like.posts.media_items.media_type,
+          cover: like.posts.media_items.image_url || 'https://via.placeholder.com/120x160',
         },
         user: {
           name: like.posts.user_profiles.display_name,
-          avatar: like.posts.user_profiles.avatar_url,
+          avatar: like.posts.user_profiles.avatar_url || 'https://via.placeholder.com/40',
         },
         likedAt: like.created_at,
-      })) || [];
-      */
-
-      // For now, return empty array until posts/likes tables are implemented
-      console.log('✅ Liked posts fetched (empty - posts/likes tables not yet implemented)');
-      return [];
+      }));
 
     } catch (error) {
       console.error('❌ Error fetching liked posts:', error);
+      // Fallback to empty array for now
+      console.log('⚠️ Returning empty array due to error');
       return [];
     }
   }
 
   /**
-   * Add a like to a post
-   * TODO: Implement when posts and likes tables are ready
+   * Add a like to a post - now uses the real likesService
    */
   async likePost(postId: string): Promise<{ success: boolean; error?: string }> {
     try {
-      const session = await supabaseAuth.getSession();
-      const userId = session.data.session?.user?.id;
-
-      if (!userId) {
-        return { success: false, error: 'No authenticated user found' };
-      }
-
-      // TODO: Implement actual like functionality
-      console.log('🔄 Would like post:', postId, 'for user:', userId);
+      console.log('❤️ Liking post:', postId);
       
-      return { success: true };
+      const result = await likesService.togglePostLike(postId);
+      
+      if (result.success && result.isLiked) {
+        console.log('✅ Post liked successfully');
+        return { success: true };
+      } else if (result.success && !result.isLiked) {
+        console.log('⚠️ Post was unliked instead of liked');
+        return { success: false, error: 'Post was already liked' };
+      } else {
+        return { success: false, error: result.error };
+      }
     } catch (error) {
       console.error('❌ Error liking post:', error);
       return { 
@@ -150,28 +155,60 @@ class LikedPostsService {
   }
 
   /**
-   * Remove a like from a post
-   * TODO: Implement when posts and likes tables are ready
+   * Remove a like from a post - now uses the real likesService
    */
   async unlikePost(postId: string): Promise<{ success: boolean; error?: string }> {
     try {
-      const session = await supabaseAuth.getSession();
-      const userId = session.data.session?.user?.id;
-
-      if (!userId) {
-        return { success: false, error: 'No authenticated user found' };
-      }
-
-      // TODO: Implement actual unlike functionality
-      console.log('🔄 Would unlike post:', postId, 'for user:', userId);
+      console.log('💔 Unliking post:', postId);
       
-      return { success: true };
+      const result = await likesService.togglePostLike(postId);
+      
+      if (result.success && !result.isLiked) {
+        console.log('✅ Post unliked successfully');
+        return { success: true };
+      } else if (result.success && result.isLiked) {
+        console.log('⚠️ Post was liked instead of unliked');
+        return { success: false, error: 'Post was not previously liked' };
+      } else {
+        return { success: false, error: result.error };
+      }
     } catch (error) {
       console.error('❌ Error unliking post:', error);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Unknown error' 
       };
+    }
+  }
+
+  /**
+   * Toggle like status on a post (recommended approach)
+   */
+  async togglePostLike(postId: string): Promise<{ success: boolean; isLiked: boolean; likeCount: number; error?: string }> {
+    try {
+      const result = await likesService.togglePostLike(postId);
+      console.log(`✅ Post like toggled - now ${result.isLiked ? 'liked' : 'unliked'}`);
+      return result;
+    } catch (error) {
+      console.error('❌ Error toggling post like:', error);
+      return { 
+        success: false, 
+        isLiked: false,
+        likeCount: 0,
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      };
+    }
+  }
+
+  /**
+   * Check if current user has liked a post
+   */
+  async isPostLiked(postId: string): Promise<boolean> {
+    try {
+      return await likesService.isPostLikedByUser(postId);
+    } catch (error) {
+      console.error('❌ Error checking if post is liked:', error);
+      return false;
     }
   }
 }

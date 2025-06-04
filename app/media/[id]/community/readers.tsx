@@ -188,12 +188,14 @@ const styles = StyleSheet.create({
   mediaTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1a1a1a',
+    fontFamily: 'LibreBaskerville_700Bold',
+    color: '#333',
     marginBottom: 4,
   },
   userCount: {
     fontSize: 14,
     color: '#666',
+    fontFamily: 'LibreBaskerville_400Regular',
   },
   listContent: {
     paddingTop: 8,
@@ -218,12 +220,14 @@ const styles = StyleSheet.create({
   userName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1a1a1a',
-    marginBottom: 2,
+    fontFamily: 'LibreBaskerville_700Bold',
+    color: '#333',
+    marginBottom: 4,
   },
   userUsername: {
     fontSize: 14,
     color: '#666',
+    fontFamily: 'LibreBaskerville_400Regular',
     marginBottom: 4,
   },
   additionalInfo: {
@@ -233,10 +237,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#004D00',
     fontWeight: '500',
+    fontFamily: 'LibreBaskerville_700Bold',
   },
   dateText: {
     fontSize: 12,
     color: '#999',
+    fontFamily: 'LibreBaskerville_400Regular',
     marginTop: 2,
   },
   followButton: {
@@ -250,6 +256,7 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 14,
     fontWeight: '600',
+    fontFamily: 'LibreBaskerville_700Bold',
   },
   loadingFooter: {
     padding: 20,
@@ -265,6 +272,7 @@ const styles = StyleSheet.create({
   emptyStateTitle: {
     fontSize: 18,
     fontWeight: '600',
+    fontFamily: 'LibreBaskerville_700Bold',
     color: '#1a1a1a',
     marginTop: 16,
     marginBottom: 8,
@@ -272,7 +280,47 @@ const styles = StyleSheet.create({
   emptyStateSubtitle: {
     fontSize: 14,
     color: '#666',
+    fontFamily: 'LibreBaskerville_400Regular',
     textAlign: 'center',
     lineHeight: 20,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: '600',
+    fontFamily: 'LibreBaskerville_700Bold',
+    color: '#333',
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: '#666',
+    fontFamily: 'LibreBaskerville_400Regular',
+    marginBottom: 20,
+  },
+  followersCount: {
+    fontSize: 13,
+    color: '#999',
+    fontWeight: '500',
+    fontFamily: 'LibreBaskerville_700Bold',
+  },
+  followersLabel: {
+    fontSize: 12,
+    color: '#999',
+    fontFamily: 'LibreBaskerville_400Regular',
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: '600',
+    fontFamily: 'LibreBaskerville_700Bold',
+    color: '#999',
+    textAlign: 'center',
+    marginTop: 40,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#999',
+    fontFamily: 'LibreBaskerville_400Regular',
+    textAlign: 'center',
+    marginTop: 8,
   },
 }); 

@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
-import { StyleSheet, Text, View, Image, ScrollView, TouchableOpacity, FlatList, StatusBar, RefreshControl } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, Text, View, Image, ScrollView, TouchableOpacity, FlatList, StatusBar, RefreshControl, ActivityIndicator } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Stack } from 'expo-router';
 import AppHeader from '@/components/AppHeader';
+import { useNotifications } from '@/contexts/NotificationsContext';
+import { Notification } from '@/lib/notificationsService';
 
 // Define types for notification data
 interface NotificationUser {
@@ -105,116 +107,141 @@ const notificationData: NotificationItem[] = [
 
 export default function NotificationsScreen() {
   const router = useRouter();
-  const [refreshing, setRefreshing] = useState(false);
+  const {
+    notifications,
+    unreadCount,
+    isLoading,
+    isRefreshing,
+    hasMore,
+    refreshNotifications,
+    loadMoreNotifications,
+    markAsRead,
+    markAllAsRead,
+    getDisplayText,
+    formatTime
+  } = useNotifications();
 
-  // TODO: Implement fetch from Supabase when backend is ready
-  // useEffect(() => {
-  //   const fetchNotifications = async () => {
-  //     // Get user notifications from Supabase
-  //     // const { data, error } = await supabase
-  //     //   .from('notifications')
-  //     //   .select('*')
-  //     //   .order('created_at', { ascending: false });
-  //   };
-  //   fetchNotifications();
-  // }, []);
+  // Local state for UI
+  const [selectedNotifications, setSelectedNotifications] = useState<Set<string>>(new Set());
 
-  const onRefresh = async () => {
-    setRefreshing(true);
+  // Mark notification as read when tapped
+  const handleNotificationPress = async (notification: Notification) => {
+    // Mark as read if unread
+    if (!notification.read_at) {
+      await markAsRead([notification.id]);
+    }
+
+    // Navigate based on notification type
+    // TODO: Implement proper navigation based on your app's routing structure
+    console.log('Notification tapped:', notification.type, notification.entity_id);
     
-    // Simulate loading time for refresh
-    // In a real app, this would trigger notification data refetch
-    setTimeout(() => {
-      setRefreshing(false);
-    }, 1000);
+    // switch (notification.type) {
+    //   case 'like_post':
+    //   case 'comment_post':
+    //   case 'new_post_from_followed':
+    //     // Navigate to post detail
+    //     router.push(`/post/${notification.entity_id}`);
+    //     break;
+    //   case 'follow_user':
+    //     // Navigate to user profile
+    //     router.push(`/profile/${notification.actor_id}`);
+    //     break;
+    //   case 'like_comment':
+    //   case 'reply_comment':
+    //     // Navigate to post containing the comment
+    //     const postId = notification.metadata?.post_id;
+    //     if (postId) {
+    //       router.push(`/post/${postId}`);
+    //     }
+    //     break;
+    //   default:
+    //     console.log('Unknown notification type:', notification.type);
+    // }
   };
 
-  const renderNotificationItem = ({ item }: { item: NotificationItem }) => {
-    // Review notification
-    if (item.type === 'review') {
+  // Handle load more when reaching end of list
+  const handleEndReached = () => {
+    if (hasMore && !isLoading) {
+      loadMoreNotifications();
+    }
+  };
+
+  // Mark all as read
+  const handleMarkAllAsRead = async () => {
+    if (unreadCount > 0) {
+      await markAllAsRead();
+    }
+  };
+
+  const renderNotificationItem = ({ item }: { item: Notification }) => {
+    const isUnread = !item.read_at;
+    const displayText = getDisplayText(item);
+    const timeText = formatTime(item.created_at);
+
       return (
-        <View style={styles.notificationItem}>
-          <View style={styles.notificationHeader}>
-            <Image source={{ uri: item.user.avatar }} style={styles.avatar} />
+      <TouchableOpacity 
+        style={[
+          styles.notificationItem,
+          isUnread && styles.unreadNotification
+        ]}
+        onPress={() => handleNotificationPress(item)}
+        activeOpacity={0.7}
+      >
+        <View style={styles.notificationRow}>
+          <Image 
+            source={{ uri: item.actor_avatar_url }} 
+            style={styles.avatar} 
+          />
             <View style={styles.notificationContent}>
               <Text style={styles.notificationText}>
-                <Text style={styles.username}>{item.user.name}</Text> is revuing{' '}
-                <Text style={styles.highlight}>{item.content.title}</Text> {item.content.details}
+              {displayText}
               </Text>
-              <Text style={styles.timestamp}>{item.content.time}</Text>
-            </View>
-            <TouchableOpacity style={styles.menuButton}>
-              <Feather name="more-horizontal" size={20} color="black" />
-            </TouchableOpacity>
+            <Text style={styles.timestamp}>{timeText}</Text>
           </View>
-          
-          {item.hasPostTitle && (
-            <View style={styles.postContainer}>
-              <Text style={styles.postTitle}>{item.postTitle}</Text>
-              <Text style={styles.postContent}>{item.postContent}</Text>
-              
-              <View style={styles.postFooter}>
-                <View style={styles.footerItem}>
-                  <Feather name="message-circle" size={16} color="#555" />
-                  <Text style={styles.footerText}>{item.commentsCount} comments</Text>
-                </View>
-                <View style={styles.footerItem}>
-                  <Feather name="heart" size={16} color="#555" />
-                  <Text style={styles.footerText}>{item.likesCount} likes</Text>
-                </View>
-                <TouchableOpacity style={styles.footerItem}>
-                  <Feather name="bookmark" size={16} color="#555" />
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
-          
-          <Image source={{ uri: item.content.image }} style={styles.mediaImage} />
+          {isUnread && <View style={styles.unreadDot} />}
         </View>
+      </TouchableOpacity>
       );
-    }
-    
-    // Comment notification
-    if (item.type === 'comment') {
-      return (
-        <View style={styles.notificationItem}>
-          <View style={styles.notificationRow}>
-            <Image source={{ uri: item.user.avatar }} style={styles.avatar} />
-            <View style={styles.notificationContent}>
-              <View style={styles.commentHeader}>
-                <Text style={styles.username}>{item.user.name}</Text>
-                <Text style={styles.timestamp}>{item.content.time}</Text>
-              </View>
-              <Text style={styles.commentText}>commented on your revue</Text>
-              <Text style={styles.commentContent}>{item.content.comment}</Text>
-            </View>
-            <Image source={{ uri: item.content.image }} style={styles.smallMediaImage} />
-          </View>
-        </View>
-      );
-    }
-    
-    // Like notification
-    if (item.type === 'like') {
-      return (
-        <View style={styles.notificationItem}>
-          <View style={styles.notificationRow}>
-            <Image source={{ uri: item.user.avatar }} style={styles.avatar} />
-            <View style={styles.notificationContent}>
-              <View style={styles.commentHeader}>
-                <Text style={styles.username}>{item.user.name}</Text>
-                <Text style={styles.timestamp}>{item.content.time}</Text>
-              </View>
-              <Text style={styles.commentText}>{item.content.action}</Text>
-            </View>
-            <Image source={{ uri: item.content.image }} style={styles.smallMediaImage} />
-          </View>
-        </View>
-      );
-    }
-    
-    return null;
   };
+
+  const renderEmptyState = () => (
+    <View style={styles.emptyContainer}>
+      <Feather name="bell" size={48} color="#CCC" />
+      <Text style={styles.emptyTitle}>No notifications yet</Text>
+      <Text style={styles.emptySubtitle}>
+        When someone likes or comments on your reviews, you'll see it here.
+      </Text>
+        </View>
+      );
+
+  const renderLoadingFooter = () => {
+    if (!isLoading || notifications.length === 0) return null;
+    
+      return (
+      <View style={styles.loadingFooter}>
+        <ActivityIndicator size="small" color="#004D00" />
+        <Text style={styles.loadingText}>Loading more...</Text>
+        </View>
+      );
+  };
+
+  const renderHeader = () => (
+    <View style={styles.headerContainer}>
+      <View style={styles.headerRow}>
+        <Text style={styles.headerTitle}>Notifications</Text>
+        {unreadCount > 0 && (
+          <TouchableOpacity onPress={handleMarkAllAsRead} style={styles.markAllButton}>
+            <Text style={styles.markAllText}>Mark all read</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+      {unreadCount > 0 && (
+        <Text style={styles.unreadCountText}>
+          {unreadCount} unread notification{unreadCount !== 1 ? 's' : ''}
+        </Text>
+      )}
+    </View>
+  );
 
   return (
     <>
@@ -227,20 +254,36 @@ export default function NotificationsScreen() {
         <AppHeader showBackButton={true} />
 
         <FlatList
-          data={notificationData}
+          data={notifications}
           renderItem={renderNotificationItem}
           keyExtractor={item => item.id}
-          contentContainerStyle={styles.listContainer}
+          contentContainerStyle={notifications.length === 0 ? styles.emptyListContainer : styles.listContainer}
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
+              refreshing={isRefreshing}
+              onRefresh={refreshNotifications}
               tintColor="#004D00"
               colors={['#004D00']}
             />
           }
+          onEndReached={handleEndReached}
+          onEndReachedThreshold={0.1}
+          ListHeaderComponent={notifications.length > 0 ? renderHeader : null}
+          ListEmptyComponent={!isLoading ? renderEmptyState : null}
+          ListFooterComponent={renderLoadingFooter}
+          initialNumToRender={10}
+          maxToRenderPerBatch={10}
+          windowSize={10}
         />
+
+        {/* Initial loading indicator */}
+        {isLoading && notifications.length === 0 && (
+          <View style={styles.initialLoadingContainer}>
+            <ActivityIndicator size="large" color="#004D00" />
+            <Text style={styles.loadingText}>Loading notifications...</Text>
+          </View>
+        )}
       </SafeAreaView>
     </>
   );
@@ -258,16 +301,57 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingTop: 10,
   },
-  notificationItem: {
+  emptyListContainer: {
+    flex: 1,
+    padding: 16,
+    paddingTop: 10,
+  },
+  headerContainer: {
     marginBottom: 20,
+    paddingBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#F2F2F2',
-    paddingBottom: 12,
   },
-  notificationHeader: {
+  headerRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 10,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#333',
+  },
+  markAllButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#004D00',
+    borderRadius: 16,
+  },
+  markAllText: {
+    fontSize: 12,
+    color: 'white',
+    fontWeight: '500',
+  },
+  unreadCountText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  notificationItem: {
+    marginBottom: 16,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F2F2F2',
+  },
+  unreadNotification: {
+    backgroundColor: '#F0F8FF',
+    marginHorizontal: -8,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderBottomWidth: 0,
+    marginBottom: 12,
   },
   notificationRow: {
     flexDirection: 'row',
@@ -285,76 +369,57 @@ const styles = StyleSheet.create({
   notificationText: {
     fontSize: 15,
     lineHeight: 22,
-  },
-  username: {
-    fontWeight: '600',
-  },
-  highlight: {
-    fontWeight: '600',
+    color: '#333',
   },
   timestamp: {
     fontSize: 13,
     color: '#888',
-    marginTop: 2,
+    marginTop: 4,
   },
-  menuButton: {
-    padding: 5,
-  },
-  mediaImage: {
-    width: '100%',
-    height: 200,
-    borderRadius: 12,
-    marginTop: 10,
-  },
-  smallMediaImage: {
-    width: 50,
-    height: 70,
-    borderRadius: 6,
-    marginLeft: 10,
-  },
-  postContainer: {
-    marginLeft: 52,
-    marginBottom: 10,
-  },
-  postTitle: {
-    fontSize: 15,
-    fontWeight: '500',
-    marginBottom: 6,
-  },
-  postContent: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: '#333',
-    marginBottom: 10,
-  },
-  postFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  unreadDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#004D00',
+    marginLeft: 8,
     marginTop: 8,
   },
-  footerItem: {
-    flexDirection: 'row',
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 20,
+    paddingHorizontal: 40,
   },
-  footerText: {
-    fontSize: 13,
-    color: '#555',
-    marginLeft: 5,
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+    marginTop: 16,
+    marginBottom: 8,
   },
-  commentHeader: {
+  emptySubtitle: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  loadingFooter: {
     flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    paddingVertical: 16,
   },
-  commentText: {
+  loadingText: {
     fontSize: 14,
-    color: '#333',
+    color: '#666',
+    marginLeft: 8,
   },
-  commentContent: {
-    fontSize: 14,
-    marginTop: 4,
-    color: '#333',
+  initialLoadingContainer: {
+    position: 'absolute',
+    top: '50%',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    transform: [{ translateY: -50 }],
   },
 });

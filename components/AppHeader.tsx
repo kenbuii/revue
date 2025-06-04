@@ -127,6 +127,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginLeft: 2,
     color: '#4CAF50',
+    fontFamily: 'LibreBaskerville_400Regular',
   },
   logo: {
     height: 30,
@@ -135,6 +136,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 18,
     fontWeight: '600',
+    fontFamily: 'LibreBaskerville_700Bold',
     color: '#333',
   },
   searchContainer: {
@@ -158,5 +160,21 @@ const styles = StyleSheet.create({
   searchButton: {
     padding: 4,
     marginLeft: 8,
+  },
+  logoText: {
+    fontSize: 16,
+    color: '#142D0A',
+    fontFamily: 'LibreBaskerville_400Regular_Italic',
+  },
+  username: {
+    fontSize: 18,
+    fontWeight: '600',
+    fontFamily: 'LibreBaskerville_700Bold',
+    marginBottom: 2,
+  },
+  actionText: {
+    fontSize: 16,
+    color: '#142D0A',
+    fontFamily: 'LibreBaskerville_400Regular',
   },
 }); 

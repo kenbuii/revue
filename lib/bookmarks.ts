@@ -131,18 +131,18 @@ class BookmarkService {
         return [];
       }
 
-      console.log('🔖 Fetching user bookmarks for:', targetUserId);
+      console.log('Fetching user bookmarks...');
 
       const bookmarks = await this.callRPC('get_user_bookmarks', {
-        p_user_id: targetUserId
+        target_user_id: targetUserId
       });
 
       const posts = bookmarks.map((bookmark: Bookmark) => this.bookmarkToPost(bookmark));
       
-      console.log('✅ User bookmarks fetched:', posts.length, 'items');
+      console.log('User bookmarks fetched successfully');
       return posts;
     } catch (error) {
-      console.error('❌ Error fetching user bookmarks:', error);
+      console.error('Error fetching user bookmarks:', error);
       throw error;
     }
   }
@@ -157,19 +157,19 @@ class BookmarkService {
         return { success: false, error: 'User not authenticated' };
       }
 
-      console.log('🔖 Adding bookmark for post:', post.id);
+      console.log('Adding bookmark...');
 
       const bookmarkData = this.postToBookmarkData(post);
       
       await this.callRPC('add_bookmark', {
-        p_user_id: userId,
+        target_user_id: userId,
         ...bookmarkData
       });
 
-      console.log('✅ Bookmark added successfully');
+      console.log('Bookmark added successfully');
       return { success: true };
     } catch (error) {
-      console.error('❌ Error adding bookmark:', error);
+      console.error('Error adding bookmark:', error);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Unknown error' 
@@ -187,17 +187,17 @@ class BookmarkService {
         return { success: false, error: 'User not authenticated' };
       }
 
-      console.log('🔖 Removing bookmark for post:', postId);
+      console.log('Removing bookmark...');
 
       await this.callRPC('remove_bookmark', {
-        p_user_id: userId,
+        target_user_id: userId,
         p_post_id: postId
       });
 
-      console.log('✅ Bookmark removed successfully');
+      console.log('Bookmark removed successfully');
       return { success: true };
     } catch (error) {
-      console.error('❌ Error removing bookmark:', error);
+      console.error('Error removing bookmark:', error);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Unknown error' 
@@ -209,9 +209,9 @@ class BookmarkService {
   async saveBookmarksLocally(posts: Post[]): Promise<void> {
     try {
       await AsyncStorage.setItem(BOOKMARKS_STORAGE_KEY, JSON.stringify(posts));
-      console.log('✅ Bookmarks saved locally');
+      console.log('Bookmarks saved locally');
     } catch (error) {
-      console.error('❌ Error saving bookmarks locally:', error);
+      console.error('Error saving bookmarks locally:', error);
     }
   }
 
@@ -220,12 +220,12 @@ class BookmarkService {
       const data = await AsyncStorage.getItem(BOOKMARKS_STORAGE_KEY);
       if (data) {
         const posts = JSON.parse(data);
-        console.log('✅ Bookmarks loaded from local storage:', posts.length, 'items');
+        console.log('Bookmarks loaded from local storage');
         return posts;
       }
       return [];
     } catch (error) {
-      console.error('❌ Error loading bookmarks from local storage:', error);
+      console.error('Error loading bookmarks from local storage:', error);
       return [];
     }
   }
@@ -233,9 +233,9 @@ class BookmarkService {
   async clearLocalBookmarks(): Promise<void> {
     try {
       await AsyncStorage.removeItem(BOOKMARKS_STORAGE_KEY);
-      console.log('✅ Local bookmarks cleared');
+      console.log('Local bookmarks cleared');
     } catch (error) {
-      console.error('❌ Error clearing local bookmarks:', error);
+      console.error('Error clearing local bookmarks:', error);
     }
   }
 
@@ -244,11 +244,11 @@ class BookmarkService {
     try {
       const localBookmarks = await this.getBookmarksLocally();
       if (localBookmarks.length === 0) {
-        console.log('📭 No local bookmarks to sync');
+        console.log('No local bookmarks to sync');
         return { success: true };
       }
 
-      console.log('🔄 Syncing', localBookmarks.length, 'local bookmarks to Supabase...');
+      console.log('Syncing local bookmarks to Supabase...');
 
       let successCount = 0;
       let errorCount = 0;
@@ -259,11 +259,11 @@ class BookmarkService {
           successCount++;
         } else {
           errorCount++;
-          console.warn('⚠️ Failed to sync bookmark:', post.id, result.error);
+          console.warn('Failed to sync bookmark:', result.error);
         }
       }
 
-      console.log(`✅ Bookmark sync complete: ${successCount} synced, ${errorCount} failed`);
+      console.log('Bookmark sync complete');
       
       if (successCount > 0) {
         // Clear local storage after successful sync
@@ -272,7 +272,7 @@ class BookmarkService {
 
       return { success: true };
     } catch (error) {
-      console.error('❌ Error syncing bookmarks:', error);
+      console.error('Error syncing bookmarks:', error);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Unknown error' 

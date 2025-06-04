@@ -102,6 +102,12 @@ class CommunityRevuesService {
    */
   async getMediaCommunityData(mediaId: string, limit: number = 10): Promise<MediaCommunityStats> {
     try {
+      // Check if Supabase is configured before making requests
+      if (!this.supabaseUrl || !this.supabaseAnonKey) {
+        console.log('ℹ️ Supabase not configured - using mock data for development');
+        return this.getEmptyStats();
+      }
+
       console.log(`🔍 Fetching community data for media: ${mediaId}`);
 
       // Get community stats using RPC function
@@ -150,7 +156,10 @@ class CommunityRevuesService {
       };
 
     } catch (error) {
-      console.error('❌ Community revues service error:', error);
+      // Only log actual network/server errors, not configuration issues
+      if (this.supabaseUrl && this.supabaseAnonKey) {
+        console.error('❌ Community revues service error:', error);
+      }
       return this.getEmptyStats();
     }
   }

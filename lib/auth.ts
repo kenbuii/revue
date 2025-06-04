@@ -307,8 +307,11 @@ class AuthService {
       // Also save to Supabase if user is authenticated
       const { session } = await this.getCurrentSession();
       if (session?.user) {
+        // IMPORTANT: Get existing onboarding data first to preserve it
+        const existingData = await this.getOnboardingData();
         await this.saveToSupabase(session.user.id, { 
-          onboarding_completed: true 
+          ...existingData,  // Preserve all existing data
+          onboarding_completed: true  // Only update the completion flag
         });
       }
       

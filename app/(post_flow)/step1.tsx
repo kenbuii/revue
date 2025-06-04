@@ -82,12 +82,13 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 24,
     fontStyle: 'italic',
+    fontFamily: 'LibreBaskerville_400Regular_Italic',
     textAlign: 'center',
     marginBottom: 40,
   },
   stepTitle: {
     fontSize: 24,
-    fontWeight: 'bold',
+    fontFamily: 'LibreBaskerville_700Bold',
     color: '#2F4F4F',
     textAlign: 'center',
     marginBottom: 20,
@@ -95,6 +96,7 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 20,
     color: '#2F4F4F',
+    fontFamily: 'LibreBaskerville_400Regular',
     textAlign: 'center',
     marginBottom: 60,
   },
@@ -111,6 +113,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
     fontSize: 16,
     color: '#2F4F4F',
+    fontFamily: 'LibreBaskerville_400Regular',
   },
   backButton: {
     position: 'absolute',
@@ -124,7 +127,7 @@ const styles = StyleSheet.create({
   backText: {
     marginLeft: 10,
     fontSize: 16,
-    fontWeight: 'bold',
+    fontFamily: 'LibreBaskerville_700Bold',
     color: '#000',
   },
 }); 

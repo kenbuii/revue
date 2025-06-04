@@ -266,14 +266,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#004D00',
     marginLeft: 8,
-    fontWeight: '500',
+    fontFamily: 'LibreBaskerville_700Bold',
   },
   scrollContent: {
     flex: 1,
   },
   sectionTitle: {
     fontSize: 22,
-    fontWeight: '600',
+    fontFamily: 'LibreBaskerville_700Bold',
     marginLeft: 16,
     marginTop: 16,
     marginBottom: 16,
@@ -288,6 +288,7 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 16,
     color: '#666',
+    fontFamily: 'LibreBaskerville_400Regular',
   },
   bottomPadding: {
     height: 60,

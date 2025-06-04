@@ -498,10 +498,10 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    marginBottom: 15,
-    color: '#000',
+    fontSize: 16,
+    color: '#333',
+    fontFamily: 'LibreBaskerville_400Regular',
+    marginBottom: 8,
   },
   divider: {
     height: 1,

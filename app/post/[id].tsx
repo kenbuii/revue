@@ -250,10 +250,13 @@ const styles = StyleSheet.create({
   username: {
     fontSize: 18,
     fontWeight: '600',
+    fontFamily: 'LibreBaskerville_700Bold',
+    color: '#333',
   },
   reviewingText: {
     color: '#666',
     fontSize: 14,
+    fontFamily: 'LibreBaskerville_400Regular',
   },
   mediaInfo: {
     backgroundColor: '#F5F5F5',
@@ -266,18 +269,24 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 16,
     marginBottom: 4,
+    fontFamily: 'LibreBaskerville_700Bold',
   },
   mediaDetails: {
     color: '#666',
     fontSize: 14,
+    fontFamily: 'LibreBaskerville_400Regular',
   },
   postTitle: {
     fontSize: 20,
     fontWeight: '600',
+    fontFamily: 'LibreBaskerville_700Bold',
+    color: '#333',
     marginBottom: 12,
   },
   postContent: {
     fontSize: 16,
+    color: '#333',
+    fontFamily: 'LibreBaskerville_400Regular',
     lineHeight: 24,
     marginBottom: 16,
   },

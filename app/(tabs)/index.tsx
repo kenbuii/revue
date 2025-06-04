@@ -1,19 +1,44 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { StyleSheet, SafeAreaView, ScrollView, RefreshControl } from 'react-native';
 import HomeHeader from '@/components/HomeHeader';
-import FeedTabs from '@/components/FeedTabs';
+import FeedTabs, { FeedTabsRef } from '@/components/FeedTabs';
+import { useFocusEffect } from '@react-navigation/native';
+
+// Declare global variable for refresh flag
+declare global {
+  var shouldRefreshFeed: boolean | undefined;
+}
 
 export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
+  const feedTabsRef = useRef<FeedTabsRef>(null);
+
+  // Refresh feed when screen comes into focus (e.g., after creating a post)
+  useFocusEffect(
+    React.useCallback(() => {
+      // Check if user is returning from post creation
+      const shouldRefresh = global.shouldRefreshFeed;
+      if (shouldRefresh) {
+        global.shouldRefreshFeed = false; // Reset flag
+        // Trigger refresh after a short delay to ensure smooth navigation
+        setTimeout(() => {
+          feedTabsRef.current?.refreshCurrentFeed();
+        }, 500);
+      }
+    }, [])
+  );
 
   const onRefresh = async () => {
     setRefreshing(true);
     
-    // Simulate loading time for refresh
-    // In a real app, this would trigger data refetch for posts, etc.
-    setTimeout(() => {
+    // Trigger feed refresh
+    try {
+      await feedTabsRef.current?.refreshCurrentFeed();
+    } catch (error) {
+      console.error('❌ Error refreshing feed:', error);
+    } finally {
       setRefreshing(false);
-    }, 1000);
+    }
   };
 
   return (
@@ -31,7 +56,7 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
       >
         <HomeHeader />
-        <FeedTabs />
+        <FeedTabs ref={feedTabsRef} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -43,6 +68,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFDF6',
   },
   scrollContainer: {
-    flex: 1,
+    flexGrow: 1,
   },
 });

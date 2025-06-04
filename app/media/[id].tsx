@@ -17,38 +17,100 @@ import { Ionicons } from '@expo/vector-icons';
 import AppHeader from '@/components/AppHeader';
 import { useBookmarks } from '@/contexts/BookmarksContext';
 import { communityRevuesService, MediaCommunityStats } from '@/lib/communityRevuesService';
+import { mediaSearchService, MediaItem } from '@/lib/mediaService';
 
 export default function MediaDetailScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams();
-  const { isBookmarked: isPostBookmarked, toggleBookmark } = useBookmarks();
+  
+  // Debug the params to see if there's an issue
+  let params;
+  try {
+    console.log('🔍 About to call useLocalSearchParams...');
+    params = useLocalSearchParams();
+    console.log('✅ useLocalSearchParams successful:', params);
+  } catch (error) {
+    console.error('❌ useLocalSearchParams failed:', error);
+    params = {};
+  }
+  
+  // Safely get bookmarks context with error handling
+  let bookmarksContext;
+  try {
+    bookmarksContext = useBookmarks();
+  } catch (error) {
+    console.error('❌ useBookmarks failed:', error);
+    // Provide fallback bookmarks context
+    bookmarksContext = {
+      isBookmarked: () => false,
+      toggleBookmark: async () => false,
+      bookmarkedPosts: [],
+      addBookmark: async () => {},
+      removeBookmark: async () => {},
+      loading: false,
+      refreshBookmarks: async () => {},
+      error: 'Failed to load bookmarks context'
+    };
+  }
+  
+  const { isBookmarked: isPostBookmarked, toggleBookmark } = bookmarksContext;
+
+  // Media data state
+  const [mediaData, setMediaData] = useState<MediaItem | null>(null);
+  const [loadingMedia, setLoadingMedia] = useState(true);
+  const [mediaError, setMediaError] = useState<string | null>(null);
 
   // Community data state
   const [communityData, setCommunityData] = useState<MediaCommunityStats | null>(null);
   const [loadingCommunity, setLoadingCommunity] = useState(true);
 
-  // Parse media data from URL params with safe defaults
-  const mediaData = {
-    id: (params.id as string) || 'unknown',
-    title: (params.title as string) || 'Unknown Title',
-    type: (params.type as 'movie' | 'tv' | 'book') || 'movie',
-    year: (params.year as string) || '',
-    image: (params.image as string) || '',
-    description: (params.description as string) || '',
-    rating: params.rating ? parseFloat(params.rating as string) : undefined,
-    author: (params.author as string) || '',
-  };
+  // Get media ID from params
+  const mediaId = (params.id as string) || '';
 
-  // Load community data on mount
+  // Load media data on mount
   useEffect(() => {
-    if (mediaData.id && mediaData.id !== 'unknown') {
+    if (mediaId) {
+      loadMediaData();
+    } else {
+      setLoadingMedia(false);
+      setMediaError('No media ID provided');
+    }
+  }, [mediaId]);
+
+  // Load community data when media data is available
+  useEffect(() => {
+    if (mediaData && mediaData.id) {
       loadCommunityData();
     } else {
       setLoadingCommunity(false);
     }
-  }, [mediaData.id]);
+  }, [mediaData]);
+
+  const loadMediaData = async () => {
+    try {
+      setLoadingMedia(true);
+      setMediaError(null);
+      
+      console.log('🎬 Fetching media data for ID:', mediaId);
+      const data = await mediaSearchService.getMediaById(mediaId);
+      
+      if (data) {
+        setMediaData(data);
+        console.log('✅ Media data loaded:', data.title);
+      } else {
+        setMediaError('Media not found');
+        console.error('❌ Media data not found for ID:', mediaId);
+      }
+    } catch (error) {
+      console.error('❌ Error loading media data:', error);
+      setMediaError(error instanceof Error ? error.message : 'Failed to load media data');
+    } finally {
+      setLoadingMedia(false);
+    }
+  };
 
   const loadCommunityData = async () => {
+    if (!mediaData?.id) return;
+    
     try {
       setLoadingCommunity(true);
       const data = await communityRevuesService.getMediaCommunityData(mediaData.id);
@@ -72,8 +134,48 @@ export default function MediaDetailScreen() {
   if (__DEV__) {
     console.log('📱 MediaDetailScreen received params:', {
       rawParams: params,
-      parsedMediaData: mediaData,
+      mediaId,
+      loadingMedia,
+      mediaData: mediaData ? { id: mediaData.id, title: mediaData.title, type: mediaData.type } : null,
     });
+  }
+
+  // Show loading state
+  if (loadingMedia) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <AppHeader 
+          title="Loading..." 
+          showBackButton={true}
+        />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#004D00" />
+          <Text style={styles.loadingText}>Loading media details...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Show error state
+  if (mediaError || !mediaData) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <AppHeader 
+          title="Error" 
+          showBackButton={true}
+        />
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle-outline" size={64} color="#FF6B6B" />
+          <Text style={styles.errorTitle}>Media Not Found</Text>
+          <Text style={styles.errorMessage}>
+            {mediaError || 'The requested media could not be loaded.'}
+          </Text>
+          <TouchableOpacity style={styles.retryButton} onPress={loadMediaData}>
+            <Text style={styles.retryButtonText}>Try Again</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
   }
 
   // Create a mock post object for bookmark functionality
@@ -132,6 +234,13 @@ export default function MediaDetailScreen() {
     return type.charAt(0).toUpperCase() + type.slice(1);
   };
 
+  // Safe text helper to ensure strings are always wrapped
+  const safeString = (value: any, fallback: string = '') => {
+    if (value === null || value === undefined) return fallback;
+    if (typeof value === 'string') return value;
+    return String(value);
+  };
+
   // Safe rendering helper to prevent text errors
   const renderCommunityStats = () => {
     if (loadingCommunity) {
@@ -143,12 +252,17 @@ export default function MediaDetailScreen() {
       );
     }
 
+    const totalRevues = communityData?.totalRevues ?? 0;
+    const readingCount = communityData?.readingCount ?? 0;
+    const wantToReadCount = communityData?.wantToReadCount ?? 0;
+    const averageRating = communityData?.averageRating ?? 0;
+
     return (
       <View style={styles.statsContainer}>
         <TouchableOpacity 
           style={styles.statItem}
           onPress={() => {
-            if ((communityData?.totalRevues ?? 0) > 0) {
+            if (totalRevues > 0) {
               router.push({
                 pathname: '/media/[id]/community/revuers',
                 params: { 
@@ -159,16 +273,14 @@ export default function MediaDetailScreen() {
             }
           }}
         >
-          <Text style={styles.statNumber}>{(communityData?.totalRevues ?? 0).toString()}</Text>
-          <Text style={styles.statLabel}>Revues</Text>
+          <Text style={styles.statNumber}>{totalRevues}</Text>
+          <Text style={styles.statLabel}>revues</Text>
         </TouchableOpacity>
-        
-        <View style={styles.statDivider} />
-        
+
         <TouchableOpacity 
           style={styles.statItem}
           onPress={() => {
-            if ((communityData?.readingCount ?? 0) > 0) {
+            if (readingCount > 0) {
               router.push({
                 pathname: '/media/[id]/community/readers',
                 params: { 
@@ -179,16 +291,14 @@ export default function MediaDetailScreen() {
             }
           }}
         >
-          <Text style={styles.statNumber}>{(communityData?.readingCount ?? 0).toString()}</Text>
-          <Text style={styles.statLabel}>Reading</Text>
+          <Text style={styles.statNumber}>{readingCount}</Text>
+          <Text style={styles.statLabel}>reading</Text>
         </TouchableOpacity>
-        
-        <View style={styles.statDivider} />
-        
+
         <TouchableOpacity 
           style={styles.statItem}
           onPress={() => {
-            if ((communityData?.wantToReadCount ?? 0) > 0) {
+            if (wantToReadCount > 0) {
               router.push({
                 pathname: '/media/[id]/community/want-to-read',
                 params: { 
@@ -199,18 +309,15 @@ export default function MediaDetailScreen() {
             }
           }}
         >
-          <Text style={styles.statNumber}>{(communityData?.wantToReadCount ?? 0).toString()}</Text>
-          <Text style={styles.statLabel}>Want to Read</Text>
+          <Text style={styles.statNumber}>{wantToReadCount}</Text>
+          <Text style={styles.statLabel}>want to read</Text>
         </TouchableOpacity>
-        
-        {communityData?.averageRating && communityData.averageRating > 0 && (
-          <>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}>
-              <Text style={styles.statNumber}>{communityData.averageRating.toFixed(1)}</Text>
-              <Text style={styles.statLabel}>Avg Rating</Text>
-            </View>
-          </>
+
+        {averageRating > 0 && (
+          <View style={styles.statItem}>
+            <Text style={styles.statNumber}>{averageRating.toFixed(1)}</Text>
+            <Text style={styles.statLabel}>avg rating</Text>
+          </View>
         )}
       </View>
     );
@@ -219,59 +326,36 @@ export default function MediaDetailScreen() {
   const handleBookmark = async () => {
     try {
       const newBookmarkState = await toggleBookmark(mockPost);
-      const message = newBookmarkState 
-        ? `"${mediaData.title}" has been added to your bookmarks.`
-        : `"${mediaData.title}" has been removed from your bookmarks.`;
-      
-      Alert.alert(
-        newBookmarkState ? 'Added to bookmarks' : 'Removed from bookmarks',
-        message
-      );
+      console.log('Bookmark toggled:', newBookmarkState);
     } catch (error) {
       console.error('Error toggling bookmark:', error);
-      Alert.alert('Error', 'Failed to update bookmark. Please try again.');
+      Alert.alert('Error', 'Failed to update bookmark');
     }
   };
 
   const handleCreatePost = () => {
-    // Navigate to step3 of post_flow with pre-filled media information
+    console.log('Create post pressed for media:', mediaData.title);
     router.push({
       pathname: '/(post_flow)/step3',
       params: {
-        title: mediaData.title,
-        creator: mediaData.author || 'Unknown',
-        type: mediaData.type,
-        year: mediaData.year || '',
-        genre: getGenre(mediaData.type),
         mediaId: mediaData.id,
-        image: mediaData.image || '',
-        // Add any other relevant fields that step3 expects
-      },
+        mediaTitle: mediaData.title,
+        mediaType: mediaData.type,
+        mediaImage: mediaData.image,
+      }
     });
   };
 
   const handleShare = async () => {
     try {
       const shareContent = {
-        message: `Check out "${mediaData.title}" ${mediaData.author ? `by ${mediaData.author}` : ''} on Revue!`,
-        url: `https://revue.app/media/${mediaData.id}`, // This would be your actual app URL
+        message: `Check out ${mediaData.title} on Revue!`,
+        url: `https://revue.app/media/${mediaData.id}`,
       };
-
-      if (Platform.OS === 'ios') {
-        // Use native iOS share sheet
-        await Share.share({
-          message: shareContent.message,
-          url: shareContent.url,
-        });
-      } else {
-        // Android fallback
-        await Share.share({
-          message: `${shareContent.message} ${shareContent.url}`,
-        });
-      }
+      
+      await Share.share(shareContent);
     } catch (error) {
-      console.error('Error sharing:', error);
-      Alert.alert('Share Error', 'Unable to share this content. Please try again.');
+      console.error('Share error:', error);
     }
   };
 
@@ -279,7 +363,7 @@ export default function MediaDetailScreen() {
     <SafeAreaView style={styles.container}>
       <AppHeader 
         showBackButton={true}
-        title={getCapitalizedType(mediaData.type)}
+        title={safeString(getCapitalizedType(mediaData.type))}
         rightComponent={
           <TouchableOpacity onPress={handleShare} style={styles.headerButton}>
             <Ionicons name="share-outline" size={24} color="#666" />
@@ -301,26 +385,28 @@ export default function MediaDetailScreen() {
           </View>
 
           <View style={styles.heroInfo}>
-            <Text style={styles.title} numberOfLines={3}>{mediaData.title}</Text>
+            <Text style={styles.mediaTitle} numberOfLines={3}>{safeString(mediaData.title)}</Text>
             
             <View style={styles.metaContainer}>
               <View style={[styles.typeTag, { backgroundColor: getMediaTypeColor(mediaData.type) }]}>
-                <Text style={styles.typeTagText}>{mediaData.type.toUpperCase()}</Text>
+                <Text style={styles.mediaType}>{safeString(mediaData.type, 'movie').toUpperCase()}</Text>
               </View>
-              {mediaData.year && <Text style={styles.year}>{mediaData.year}</Text>}
+              {mediaData.year ? (
+                <Text style={styles.mediaYear}>{safeString(mediaData.year)}</Text>
+              ) : null}
             </View>
 
-            {mediaData.author && (
-              <Text style={styles.author}>by {mediaData.author}</Text>
-            )}
+            {mediaData.author ? (
+              <Text style={styles.author}>by {safeString(mediaData.author)}</Text>
+            ) : null}
 
-            {mediaData.rating && (
+            {mediaData.rating ? (
               <View style={styles.ratingContainer}>
                 <Ionicons name="star" size={16} color="#FFD700" />
                 <Text style={styles.rating}>{mediaData.rating.toFixed(1)}</Text>
                 <Text style={styles.ratingOutOf}>/ 10</Text>
               </View>
-            )}
+            ) : null}
           </View>
         </View>
 
@@ -347,12 +433,12 @@ export default function MediaDetailScreen() {
         </View>
 
         {/* Description Section */}
-        {mediaData.description && (
+        {mediaData.description ? (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>About</Text>
-            <Text style={styles.description}>{mediaData.description}</Text>
+            <Text style={styles.description}>{safeString(mediaData.description)}</Text>
           </View>
-        )}
+        ) : null}
 
         {/* Stats Section */}
         <View style={styles.section}>
@@ -370,55 +456,64 @@ export default function MediaDetailScreen() {
             </View>
           ) : communityData?.recentRevues && communityData.recentRevues.length > 0 ? (
             <View style={styles.revuesContainer}>
-              {communityData.recentRevues.map((revue) => (
-                <View key={revue.id} style={styles.revueCard}>
-                  <View style={styles.revueHeader}>
-                    <Image 
-                      source={{ uri: revue.user.avatar || 'https://via.placeholder.com/40' }} 
-                      style={styles.userAvatar}
-                    />
-                    <View style={styles.revueUserInfo}>
-                      <Text style={styles.revueUserName}>{revue.user.name || 'Anonymous'}</Text>
-                      <Text style={styles.revueDate}>
-                        {revue.createdAt ? new Date(revue.createdAt).toLocaleDateString() : 'Unknown date'}
-                      </Text>
-                    </View>
-                    {revue.rating && typeof revue.rating === 'number' && revue.rating > 0 && (
-                      <View style={styles.revueRating}>
-                        <Ionicons name="star" size={12} color="#FFD700" />
-                        <Text style={styles.revueRatingText}>{revue.rating.toFixed(1)}</Text>
+              {communityData.recentRevues.map((revue) => {
+                const userName = safeString(revue.user.name, 'Anonymous');
+                const reviewDate = revue.createdAt 
+                  ? new Date(revue.createdAt).toLocaleDateString() 
+                  : 'Unknown date';
+                const reviewContent = safeString(revue.content, 'No content available');
+                const likeCount = (revue.likeCount || 0).toString();
+                const commentCount = (revue.commentCount || 0).toString();
+                const hasRating = revue.rating && typeof revue.rating === 'number' && revue.rating > 0;
+
+                return (
+                  <View key={revue.id} style={styles.revueCard}>
+                    <View style={styles.revueHeader}>
+                      <Image 
+                        source={{ uri: revue.user.avatar || 'https://via.placeholder.com/40' }} 
+                        style={styles.userAvatar}
+                      />
+                      <View style={styles.revueUserInfo}>
+                        <Text style={styles.reviewTitle}>{userName}</Text>
+                        <Text style={styles.reviewDate}>{reviewDate}</Text>
                       </View>
-                    )}
-                  </View>
-                  <Text style={styles.revueContent} numberOfLines={3}>
-                    {revue.content || 'No content available'}
-                  </Text>
-                  <View style={styles.revueFooter}>
-                    <View style={styles.revueStats}>
-                      <Ionicons name="heart-outline" size={14} color="#999" />
-                      <Text style={styles.revueStatText}>{revue.likeCount || 0}</Text>
-                      <Ionicons name="chatbubble-outline" size={14} color="#999" style={{ marginLeft: 12 }} />
-                      <Text style={styles.revueStatText}>{revue.commentCount || 0}</Text>
+                      {hasRating ? (
+                        <View style={styles.revueRating}>
+                          <Ionicons name="star" size={12} color="#FFD700" />
+                          <Text style={styles.ratingText}>{revue.rating!.toFixed(1)}</Text>
+                        </View>
+                      ) : null}
+                    </View>
+                    <Text style={styles.reviewText} numberOfLines={3}>
+                      {reviewContent}
+                    </Text>
+                    <View style={styles.revueFooter}>
+                      <View style={styles.revueStats}>
+                        <Ionicons name="heart-outline" size={14} color="#999" />
+                        <Text style={styles.communityCount}>{likeCount}</Text>
+                        <Ionicons name="chatbubble-outline" size={14} color="#999" style={{ marginLeft: 12 }} />
+                        <Text style={styles.communityCount}>{commentCount}</Text>
+                      </View>
                     </View>
                   </View>
-                </View>
-              ))}
+                );
+              })}
               <TouchableOpacity style={styles.viewAllButton}>
                 <Text style={styles.viewAllButtonText}>View All Revues</Text>
                 <Ionicons name="chevron-forward" size={16} color="#004D00" />
               </TouchableOpacity>
             </View>
           ) : (
-            <View style={styles.emptyState}>
-              <Ionicons name="chatbubbles-outline" size={48} color="#E0E0E0" />
-              <Text style={styles.emptyStateTitle}>No revues yet</Text>
-              <Text style={styles.emptyStateSubtitle}>
-                Be the first to share your thoughts about "{mediaData.title}"
-              </Text>
-              <TouchableOpacity style={styles.createFirstButton} onPress={handleCreatePost}>
-                <Text style={styles.createFirstButtonText}>Write First Revue</Text>
-              </TouchableOpacity>
-            </View>
+          <View style={styles.emptyState}>
+            <Ionicons name="chatbubbles-outline" size={48} color="#E0E0E0" />
+            <Text style={styles.emptyStateTitle}>No revues yet</Text>
+            <Text style={styles.emptyStateSubtitle}>
+              Be the first to share your thoughts about "{safeString(mediaData.title)}"
+            </Text>
+            <TouchableOpacity style={styles.createFirstButton} onPress={handleCreatePost}>
+              <Text style={styles.createFirstButtonText}>Write First Revue</Text>
+            </TouchableOpacity>
+          </View>
           )}
         </View>
 
@@ -475,12 +570,12 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'flex-start',
   },
-  title: {
+  mediaTitle: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#1a1a1a',
+    fontFamily: 'LibreBaskerville_700Bold',
+    color: '#333',
     marginBottom: 8,
-    lineHeight: 28,
   },
   metaContainer: {
     flexDirection: 'row',
@@ -495,17 +590,22 @@ const styles = StyleSheet.create({
     marginRight: 10,
     marginBottom: 4,
   },
-  typeTagText: {
-    color: 'white',
+  mediaType: {
     fontSize: 10,
     fontWeight: '700',
-    letterSpacing: 0.5,
+    fontFamily: 'LibreBaskerville_700Bold',
+    color: 'white',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    textTransform: 'uppercase',
   },
-  year: {
+  mediaYear: {
     fontSize: 16,
     color: '#666',
     fontWeight: '500',
-    marginBottom: 4,
+    fontFamily: 'LibreBaskerville_700Bold',
+    marginLeft: 8,
   },
   author: {
     fontSize: 14,
@@ -591,13 +691,17 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1a1a1a',
+    fontFamily: 'LibreBaskerville_700Bold',
+    color: '#333',
     marginBottom: 12,
   },
   description: {
-    fontSize: 15,
-    lineHeight: 22,
-    color: '#555',
+    fontSize: 14,
+    color: '#666',
+    fontStyle: 'italic',
+    fontFamily: 'LibreBaskerville_400Regular_Italic',
+    lineHeight: 20,
+    marginTop: 12,
   },
   statsContainer: {
     flexDirection: 'row',
@@ -611,6 +715,7 @@ const styles = StyleSheet.create({
   statNumber: {
     fontSize: 20,
     fontWeight: '700',
+    fontFamily: 'LibreBaskerville_700Bold',
     color: '#004D00',
     marginBottom: 4,
   },
@@ -618,11 +723,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     fontWeight: '500',
-  },
-  statDivider: {
-    width: 1,
-    height: 30,
-    backgroundColor: '#E8E8E8',
   },
   emptyState: {
     alignItems: 'center',
@@ -692,30 +792,34 @@ const styles = StyleSheet.create({
   revueUserInfo: {
     flex: 1,
   },
-  revueUserName: {
-    fontSize: 16,
+  reviewTitle: {
+    fontSize: 18,
     fontWeight: '600',
-    color: '#1a1a1a',
+    fontFamily: 'LibreBaskerville_700Bold',
+    color: '#333',
+    marginBottom: 8,
   },
-  revueDate: {
+  reviewDate: {
     fontSize: 14,
-    color: '#666',
-    fontWeight: '500',
+    color: '#999',
+    fontFamily: 'LibreBaskerville_400Regular',
   },
   revueRating: {
     flexDirection: 'row',
     alignItems: 'center',
     marginLeft: 'auto',
   },
-  revueRatingText: {
-    fontSize: 14,
+  ratingText: {
+    fontSize: 12,
+    color: '#666',
     fontWeight: '600',
-    color: '#FFD700',
     marginLeft: 4,
   },
-  revueContent: {
-    fontSize: 15,
+  reviewText: {
+    fontSize: 14,
     color: '#555',
+    fontFamily: 'LibreBaskerville_400Regular',
+    lineHeight: 20,
   },
   revueFooter: {
     flexDirection: 'row',
@@ -726,10 +830,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  revueStatText: {
-    fontSize: 14,
-    color: '#999',
-    marginLeft: 4,
+  communityCount: {
+    fontSize: 15,
+    fontWeight: '500',
+    fontFamily: 'LibreBaskerville_700Bold',
+    color: '#666',
   },
   viewAllButton: {
     flexDirection: 'row',
@@ -746,5 +851,35 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     marginRight: 4,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#FF6B6B',
+    marginBottom: 16,
+  },
+  errorMessage: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 20,
+  },
+  retryButton: {
+    backgroundColor: '#004D00',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  retryButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

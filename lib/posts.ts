@@ -9,7 +9,7 @@ export interface PostData {
   title?: string;
   content: string;
   rating?: number;
-  content_type?: 'text' | 'image' | 'video';
+  content_type?: 'review' | 'thought' | 'recommendation';
   tags?: string[];
   like_count?: number;
   comment_count?: number;
@@ -44,10 +44,9 @@ export interface MediaItem {
   year?: string;
   image_url?: string;
   description?: string;
-  author?: string;
-  director?: string;
+  creator?: string;
   genre?: string;
-  source: 'tmdb' | 'google_books' | 'popular';
+  source: 'tmdb' | 'google_books' | 'popular' | 'nyt_bestsellers';
   original_api_id?: string;
   metadata?: any;
 }
@@ -60,7 +59,7 @@ export interface CreatePostParams {
   mediaType: 'movie' | 'tv' | 'book';
   mediaYear?: string;
   mediaGenre?: string;
-  mediaCreator?: string; // author/director
+  mediaCreator?: string;
   mediaCover?: string;
   
   // Post content
@@ -71,7 +70,7 @@ export interface CreatePostParams {
   tags?: string[];
   
   // Location context (for books/movies)
-  location?: string; // page number, timestamp, etc.
+  location?: string;
 }
 
 const DRAFT_POSTS_STORAGE_KEY = '@revue_draft_posts';
@@ -128,31 +127,27 @@ class PostService {
   // Create or update media item in database
   private async ensureMediaItem(params: CreatePostParams): Promise<string> {
     try {
-      const mediaItem: Partial<MediaItem> = {
-        id: params.mediaId || `${params.mediaType}_${Date.now()}`,
-        title: params.mediaTitle,
-        media_type: params.mediaType,
-        year: params.mediaYear,
-        image_url: params.mediaCover,
-        description: '', // We don't have description from post flow
-        author: params.mediaType === 'book' ? params.mediaCreator : undefined,
-        director: params.mediaType !== 'book' ? params.mediaCreator : undefined,
-        genre: params.mediaGenre,
-        source: 'popular', // Default source for user-created media
-        metadata: {
-          created_via: 'post_flow',
-          genre: params.mediaGenre,
-          creator: params.mediaCreator,
-        }
-      };
-
-      // Try to insert or update the media item
-      await this.makeDirectRequest('media_items', 'POST', mediaItem);
+      // Use the new upsert function instead of direct insertion
+      const mediaId = params.mediaId || `${params.mediaType}_${Date.now()}`;
       
-      return mediaItem.id!;
+      const result = await this.callRPC('upsert_media_item', {
+        p_media_id: mediaId,
+        p_title: params.mediaTitle,
+        p_media_type: params.mediaType,
+        p_year: params.mediaYear,
+        p_image_url: params.mediaCover,
+        p_description: '', // Could be extended later
+        p_creator: params.mediaCreator,
+        p_genre: params.mediaGenre,
+        p_source: 'popular',
+        p_original_api_id: null,
+      });
+
+      console.log('✅ Media item upserted successfully:', result);
+      return result; // The function returns the media_id
     } catch (error) {
-      console.warn('❌ Failed to create media item, using generated ID:', error);
-      // If media item creation fails, return a generated ID
+      console.warn('❌ Failed to upsert media item, using generated ID:', error);
+      // If upsert fails, return a generated ID
       return params.mediaId || `${params.mediaType}_${Date.now()}`;
     }
   }
@@ -173,14 +168,15 @@ class PostService {
       const mediaId = await this.ensureMediaItem(params);
 
       // Prepare post data
-      const postData: Partial<PostData> = {
+      const postData = {
         user_id: userId,
         media_id: mediaId,
         title: params.title,
         content: params.content,
-        rating: params.rating,
-        content_type: params.imageUrl ? 'image' : 'text',
+        rating: params.rating ? Math.round(params.rating) : undefined,
+        content_type: 'review',
         tags: params.tags || [],
+        location_context: params.location,
         is_public: true,
       };
 
@@ -205,26 +201,15 @@ class PostService {
   // Get user's posts
   async getUserPosts(userId?: string, limit: number = 20): Promise<Post[]> {
     try {
-      const session = await supabaseAuth.getSession();
-      const targetUserId = userId || session.data.session?.user?.id;
-
+      const targetUserId = userId || (await supabaseAuth.getSession()).data.session?.user?.id;
+      
       if (!targetUserId) {
-        console.log('No user ID provided and no session found');
         return [];
       }
 
-      console.log('📖 Fetching user posts for:', targetUserId);
-
-      // Get posts with user and media information
-      const posts = await this.makeDirectRequest(
-        `posts?select=*,user_profiles(display_name,username,avatar_url),media_items(*)&user_id=eq.${targetUserId}&order=created_at.desc&limit=${limit}`
-      );
-
-      // Transform to UI format
-      const transformedPosts = posts.map((post: any) => this.transformToPost(post));
+      const posts = await this.makeDirectRequest(`posts?user_id=eq.${targetUserId}&limit=${limit}&order=created_at.desc`);
       
-      console.log('✅ User posts fetched:', transformedPosts.length, 'items');
-      return transformedPosts;
+      return posts.map((post: any) => this.transformToPost(post));
     } catch (error) {
       console.error('❌ Error fetching user posts:', error);
       return [];
@@ -234,101 +219,92 @@ class PostService {
   // Get posts for a specific media item
   async getMediaPosts(mediaId: string, limit: number = 10): Promise<Post[]> {
     try {
-      console.log('📖 Fetching posts for media:', mediaId);
-
-      const posts = await this.makeDirectRequest(
-        `posts?select=*,user_profiles(display_name,username,avatar_url),media_items(*)&media_id=eq.${mediaId}&is_public=eq.true&order=created_at.desc&limit=${limit}`
-      );
-
-      const transformedPosts = posts.map((post: any) => this.transformToPost(post));
+      const posts = await this.makeDirectRequest(`posts?media_id=eq.${mediaId}&is_public=eq.true&limit=${limit}&order=created_at.desc`);
       
-      console.log('✅ Media posts fetched:', transformedPosts.length, 'items');
-      return transformedPosts;
+      return posts.map((post: any) => this.transformToPost(post));
     } catch (error) {
       console.error('❌ Error fetching media posts:', error);
       return [];
     }
   }
 
-  // Transform database post to UI Post interface
+  // Transform database post to UI post
   private transformToPost(dbPost: any): Post {
-    const userProfile = dbPost.user_profiles;
-    const mediaItem = dbPost.media_items;
-    
     return {
       id: dbPost.id,
       user: {
-        name: userProfile?.display_name || userProfile?.username || 'Anonymous',
-        avatar: userProfile?.avatar_url || 'https://via.placeholder.com/40'
+        name: dbPost.user_profiles?.display_name || dbPost.user_profiles?.username || 'Unknown User',
+        avatar: dbPost.user_profiles?.avatar_url || '',
       },
       media: {
-        id: mediaItem?.id || dbPost.media_id,
-        title: mediaItem?.title || 'Unknown Media',
-        type: mediaItem?.media_type || 'media',
-        cover: mediaItem?.image_url || 'https://via.placeholder.com/120x160'
+        id: dbPost.media_id,
+        title: dbPost.media_items?.title || 'Unknown Media',
+        type: dbPost.media_items?.media_type || 'unknown',
+        cover: dbPost.media_items?.image_url || '',
       },
       date: dbPost.created_at,
       title: dbPost.title,
       contentType: dbPost.content_type === 'image' ? 'image' : 'text',
       content: dbPost.content,
+      textContent: dbPost.content,
       commentCount: dbPost.comment_count || 0,
       likeCount: dbPost.like_count || 0,
-      isBookmarked: false, // This would be determined by bookmark context
-      isLiked: false, // This would be determined by likes context
+      isBookmarked: false,
+      isLiked: false,
       rating: dbPost.rating,
     };
   }
 
-  // Local storage for drafts
+  // Save post as draft
   async saveDraftPost(params: CreatePostParams): Promise<void> {
     try {
       const drafts = await this.getDraftPosts();
-      const draftWithId = {
-        ...params,
+      const newDraft = {
         id: `draft_${Date.now()}`,
+        ...params,
         savedAt: new Date().toISOString(),
       };
       
-      const updatedDrafts = [...drafts, draftWithId];
+      const updatedDrafts = [...drafts, newDraft];
       await AsyncStorage.setItem(DRAFT_POSTS_STORAGE_KEY, JSON.stringify(updatedDrafts));
-      console.log('✅ Draft post saved locally');
+      
+      console.log('💾 Draft saved successfully');
     } catch (error) {
-      console.error('❌ Error saving draft post:', error);
+      console.error('❌ Error saving draft:', error);
+      throw error;
     }
   }
 
+  // Get saved draft posts
   async getDraftPosts(): Promise<(CreatePostParams & { id: string; savedAt: string })[]> {
     try {
-      const data = await AsyncStorage.getItem(DRAFT_POSTS_STORAGE_KEY);
-      if (data) {
-        const drafts = JSON.parse(data);
-        console.log('✅ Draft posts loaded from local storage:', drafts.length, 'items');
-        return drafts;
-      }
-      return [];
+      const draftsString = await AsyncStorage.getItem(DRAFT_POSTS_STORAGE_KEY);
+      return draftsString ? JSON.parse(draftsString) : [];
     } catch (error) {
-      console.error('❌ Error loading draft posts:', error);
+      console.error('❌ Error loading drafts:', error);
       return [];
     }
   }
 
+  // Delete a specific draft
   async deleteDraftPost(draftId: string): Promise<void> {
     try {
       const drafts = await this.getDraftPosts();
       const updatedDrafts = drafts.filter(draft => draft.id !== draftId);
       await AsyncStorage.setItem(DRAFT_POSTS_STORAGE_KEY, JSON.stringify(updatedDrafts));
-      console.log('✅ Draft post deleted');
     } catch (error) {
-      console.error('❌ Error deleting draft post:', error);
+      console.error('❌ Error deleting draft:', error);
+      throw error;
     }
   }
 
+  // Clear all drafts
   async clearDraftPosts(): Promise<void> {
     try {
       await AsyncStorage.removeItem(DRAFT_POSTS_STORAGE_KEY);
-      console.log('✅ All draft posts cleared');
     } catch (error) {
-      console.error('❌ Error clearing draft posts:', error);
+      console.error('❌ Error clearing drafts:', error);
+      throw error;
     }
   }
 }
