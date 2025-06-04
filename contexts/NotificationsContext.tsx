@@ -28,6 +28,10 @@ interface NotificationsContextType {
   markAllAsRead: () => Promise<MarkAsReadResult>;
   updatePreferences: (updates: Partial<NotificationPreferences>) => Promise<{ success: boolean; error?: string }>;
   
+  // Real-time actions
+  addNewNotification: (notification: Notification) => void;
+  updateUnreadCount: (updater: (count: number) => number) => void;
+  
   // Utility
   getDisplayText: (notification: Notification) => string;
   formatTime: (timestamp: string) => string;
@@ -229,6 +233,34 @@ export function NotificationsProvider({ children }: NotificationsProviderProps) 
   }, [isAuthenticated, preferences]);
 
   // ==========================================
+  // REAL-TIME METHODS
+  // ==========================================
+
+  /**
+   * Add a new notification to the beginning of the list (real-time)
+   */
+  const addNewNotification = useCallback((newNotification: Notification) => {
+    setNotifications(prev => {
+      // Check if notification already exists to prevent duplicates
+      const exists = prev.some(n => n.id === newNotification.id);
+      if (exists) return prev;
+      
+      // Add to beginning of array (most recent first)
+      return [newNotification, ...prev];
+    });
+  }, []);
+
+  /**
+   * Update unread count (real-time)
+   */
+  const updateUnreadCount = useCallback((updater: (count: number) => number) => {
+    setUnreadCount(prev => {
+      const newCount = updater(prev);
+      return Math.max(0, newCount); // Ensure count never goes negative
+    });
+  }, []);
+
+  // ==========================================
   // UTILITY METHODS
   // ==========================================
 
@@ -291,6 +323,10 @@ export function NotificationsProvider({ children }: NotificationsProviderProps) 
     markAsRead,
     markAllAsRead,
     updatePreferences,
+    
+    // Real-time actions
+    addNewNotification,
+    updateUnreadCount,
     
     // Utility
     getDisplayText,

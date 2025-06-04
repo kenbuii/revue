@@ -14,7 +14,7 @@ import { feedService, FeedPost } from '@/lib/feedService';
 
 // Remove mock data - now using real data from feedService
 export default function ProfileScreen() {
-  const { bookmarkedPosts } = useBookmarks();
+  const { bookmarkedPosts, removeBookmark } = useBookmarks();
   const { 
     profile, 
     mediaPreferences, 
@@ -120,6 +120,39 @@ export default function ProfileScreen() {
         description: '',
       },
     });
+  };
+
+  const handleRemoveBookmark = (postId: string, postTitle: string, event: any) => {
+    event.stopPropagation();
+    
+    Alert.alert(
+      'Remove Bookmark',
+      `Remove "${postTitle}" from your bookmarks?`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await removeBookmark(postId);
+              Alert.alert(
+                'Bookmark Removed',
+                `"${postTitle}" has been removed from your bookmarks.`,
+                [{ text: 'OK' }],
+                { cancelable: true }
+              );
+            } catch (error) {
+              console.error('Error removing bookmark:', error);
+              Alert.alert('Error', 'Failed to remove bookmark. Please try again.');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const formatPostDate = (dateString: string) => {
@@ -304,27 +337,37 @@ export default function ProfileScreen() {
                 contentContainerStyle={styles.horizontalScrollContent}
               >
                 {bookmarkedPosts.map(item => (
-                  <TouchableOpacity 
-                    key={item.id} 
-                    style={styles.bookmarkCard}
-                    onPress={() => router.push({
-                      pathname: '/media/[id]' as const,
-                      params: {
-                        id: item.media.id,
-                        title: item.media.title,
-                        type: item.media.type,
-                        year: '',
-                        image: item.media.cover,
-                        description: '',
-                      },
-                    })}
-                  >
-                    <Image source={{ uri: item.media.cover }} style={styles.mediaCover} />
-                    <View style={styles.bookmarkTextContainer}>
-                      <Text style={styles.mediaAuthor}>{item.media.title}</Text>
-                      <Text style={styles.bookmarkComment} numberOfLines={3}>{item.title || item.content}</Text>
-                    </View>
-                  </TouchableOpacity>
+                  <View key={item.id} style={styles.bookmarkCardContainer}>
+                    <TouchableOpacity 
+                      style={styles.bookmarkCard}
+                      onPress={() => router.push({
+                        pathname: '/media/[id]' as const,
+                        params: {
+                          id: item.media.id,
+                          title: item.media.title,
+                          type: item.media.type,
+                          year: '',
+                          image: item.media.cover,
+                          description: '',
+                        },
+                      })}
+                    >
+                      <Image source={{ uri: item.media.cover }} style={styles.mediaCover} />
+                      <View style={styles.bookmarkTextContainer}>
+                        <Text style={styles.mediaAuthor}>{item.media.title}</Text>
+                      </View>
+                    </TouchableOpacity>
+                    
+                    {/* Remove button */}
+                    <TouchableOpacity
+                      style={styles.bookmarkRemoveButton}
+                      onPress={(e) => handleRemoveBookmark(item.id, item.media.title, e)}
+                    >
+                      <View style={styles.bookmarkRemoveButtonBackground}>
+                        <Ionicons name="close" size={12} color="white" />
+                      </View>
+                    </TouchableOpacity>
+                  </View>
                 ))}
               </ScrollView>
             ) : (
@@ -656,15 +699,14 @@ const styles = StyleSheet.create({
     width: 140,
     marginRight: 12,
   },
+  bookmarkCardContainer: {
+    position: 'relative',
+    width: 140,
+    marginRight: 12,
+  },
   bookmarkTextContainer: {
     marginTop: 8,
     paddingHorizontal: 4,
-  },
-  bookmarkComment: {
-    fontSize: 12,
-    color: '#666',
-    lineHeight: 16,
-    fontFamily: 'LibreBaskerville_400Regular',
   },
   bookmarkButton: {
     padding: 8,
@@ -676,8 +718,8 @@ const styles = StyleSheet.create({
   },
   bookmarkRemoveButton: {
     position: 'absolute',
-    top: 0,
-    right: 0,
+    top: 4,
+    right: 4,
     padding: 4,
     borderRadius: 12,
   },
@@ -685,7 +727,7 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: '#666',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'center',
     alignItems: 'center',
   },
