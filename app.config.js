@@ -20,8 +20,7 @@ export default {
     ],
     ios: {
       supportsTablet: true,
-      bundleIdentifier: "com.yourcompany.revue",
-      deploymentTarget: "15.1"
+      bundleIdentifier: "com.yourcompany.revue"
     },
     android: {
       adaptiveIcon: {

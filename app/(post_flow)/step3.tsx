@@ -42,6 +42,28 @@ export default function Step3() {
     }
   }, [JSON.stringify(params)]); // Stable dependency to prevent infinite re-renders
 
+  // Safe navigation back to media page
+  const navigateBackToMedia = () => {
+    const mediaId = params.mediaId as string;
+    if (mediaId) {
+      console.log('🔙 Navigating back to media:', mediaId);
+      router.push(`/media/${mediaId}`);
+    } else {
+      console.log('🔙 No media ID, going to tabs');
+      router.push('/(tabs)');
+    }
+  };
+
+  // Safe navigation with error handling
+  const safeNavigateBack = () => {
+    try {
+      navigateBackToMedia();
+    } catch (error) {
+      console.error('❌ Navigation error, falling back to tabs:', error);
+      router.push('/(tabs)');
+    }
+  };
+
   const handleDebugPostFlow = async () => {
     Alert.alert(
       'Debug Post Flow', 
@@ -219,9 +241,7 @@ export default function Step3() {
             },
             {
               text: 'Back to Media',
-              onPress: () => {
-                router.back();
-              },
+              onPress: safeNavigateBack,
             },
           ],
           { cancelable: false }
@@ -311,7 +331,7 @@ export default function Step3() {
         >
           <TouchableOpacity
             style={styles.backButton}
-            onPress={() => router.back()}
+            onPress={safeNavigateBack}
           >
             <Ionicons name="chevron-back" size={24} color="#000" />
             <Text style={styles.backButtonText}>Back</Text>

@@ -352,11 +352,29 @@ class AuthService {
         return;
       }
 
-      // Get auth token
-      const { session } = await this.getCurrentSession();
-      const token = session?.access_token || supabaseAnonKey;
+      // CRITICAL: Validate user ID to prevent data mixing
+      if (!userId || userId.trim() === '' || userId === 'undefined' || userId === 'null') {
+        console.error('🚨 SECURITY: Invalid user ID detected, aborting save to prevent data corruption:', userId);
+        throw new Error('Invalid user ID - cannot save onboarding data');
+      }
 
-      // Prepare data for Supabase function with parameters that ACTUALLY exist in the database
+      // Get current session and validate it matches the provided user ID
+      const { session } = await this.getCurrentSession();
+      if (!session?.user?.id) {
+        console.error('🚨 SECURITY: No active session found, aborting save');
+        throw new Error('No active session - cannot save onboarding data');
+      }
+
+      if (session.user.id !== userId) {
+        console.error('🚨 SECURITY: User ID mismatch detected!');
+        console.error('- Provided user ID:', userId);
+        console.error('- Session user ID:', session.user.id);
+        throw new Error('User ID mismatch - potential security issue');
+      }
+
+      const token = session.access_token || supabaseAnonKey;
+
+      // Add user validation to data payload
       const payload: any = {
         p_user_id: userId,
         // Parameters that actually exist in the deployed Supabase function:
@@ -367,9 +385,13 @@ class AuthService {
         p_onboarding_completed: data.onboarding_completed || false,
       };
 
-      // Note: p_username is NOT in the deployed function, so we'll save it separately
-
-      console.log('💾 Saving onboarding data to Supabase (excluding username - will save separately)...', payload);
+      // Log the save attempt with security info
+      console.log('💾 SECURE: Saving onboarding data to Supabase for verified user:', {
+        userId: userId,
+        sessionUserId: session.user.id,
+        displayName: payload.p_display_name,
+        mediaPreferencesCount: payload.p_media_preferences?.length || 0
+      });
 
       const response = await fetch(`${supabaseUrl}/rest/v1/rpc/save_user_onboarding_data`, {
         method: 'POST',
@@ -398,7 +420,12 @@ class AuthService {
 
     } catch (error) {
       console.error('❌ Error saving to Supabase:', error);
-      // Don't throw - graceful degradation, local storage still works
+      // Re-throw security errors to prevent data corruption
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (errorMessage.includes('security') || errorMessage.includes('mismatch') || errorMessage.includes('Invalid user ID')) {
+        throw error;
+      }
+      // Don't throw for other errors - graceful degradation, local storage still works
     }
   }
 
@@ -415,11 +442,33 @@ class AuthService {
         return;
       }
 
-      // Get auth token
-      const { session } = await this.getCurrentSession();
-      const token = session?.access_token || supabaseAnonKey;
+      // CRITICAL: Validate inputs to prevent data mixing
+      if (!userId || userId.trim() === '' || userId === 'undefined' || userId === 'null') {
+        console.error('🚨 SECURITY: Invalid user ID for username save:', userId);
+        throw new Error('Invalid user ID - cannot save username');
+      }
 
-      console.log('💾 Saving username directly to user_profiles table...', { userId, username });
+      if (!username || username.trim() === '') {
+        console.error('🚨 SECURITY: Empty username provided, aborting save');
+        throw new Error('Empty username - cannot save');
+      }
+
+      // Validate current session matches user ID
+      const { session } = await this.getCurrentSession();
+      if (!session?.user?.id || session.user.id !== userId) {
+        console.error('🚨 SECURITY: User ID mismatch in username save!');
+        console.error('- Provided user ID:', userId);
+        console.error('- Session user ID:', session?.user?.id);
+        throw new Error('User ID mismatch in username save');
+      }
+
+      const token = session.access_token || supabaseAnonKey;
+
+      console.log('💾 SECURE: Saving username for verified user:', { 
+        userId: userId, 
+        username: username,
+        sessionUserId: session.user.id
+      });
 
       const response = await fetch(`${supabaseUrl}/rest/v1/user_profiles?id=eq.${userId}`, {
         method: 'PATCH',
@@ -437,13 +486,29 @@ class AuthService {
       if (!response.ok) {
         const errorData = await response.text();
         console.error('❌ Username save error:', response.status, errorData);
+        
+        // Special handling for duplicate username constraint
+        if (response.status === 409 && errorData.includes('user_profiles_username_key')) {
+          console.error('🚨 DUPLICATE USERNAME: Username already exists:', username);
+          throw new Error(`Username "${username}" is already taken. Please choose a different username.`);
+        }
+        
         return;
       }
 
-      console.log('✅ Username saved directly to database');
+      console.log('✅ Username saved securely to database');
 
     } catch (error) {
       console.error('❌ Error saving username directly:', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      // Re-throw security errors and username conflicts
+      if (errorMessage.includes('security') || 
+          errorMessage.includes('mismatch') || 
+          errorMessage.includes('already taken') ||
+          errorMessage.includes('Invalid user ID')) {
+        throw error;
+      }
     }
   }
 
@@ -454,12 +519,25 @@ class AuthService {
     try {
       // 1. Save to local storage (for offline access and immediate availability)
       const existingData = await this.getOnboardingData();
-      const updatedData = { ...existingData, ...data };
+      
+      // Add current user ID for validation if available
+      const { session } = await this.getCurrentSession();
+      const updatedData = { 
+        ...existingData, 
+        ...data,
+        userId: session?.user?.id || existingData.userId, // Preserve existing if no session
+        lastUpdated: new Date().toISOString()
+      };
+      
       await AsyncStorage.setItem('onboarding_data', JSON.stringify(updatedData));
-      console.log('💾 Onboarding data saved locally:', updatedData);
+      console.log('💾 Onboarding data saved locally with user validation:', {
+        userId: updatedData.userId,
+        dataKeys: Object.keys(updatedData),
+        displayName: updatedData.displayName,
+        username: updatedData.username
+      });
 
       // 2. Save to Supabase (for persistence and cross-device sync)
-      const { session } = await this.getCurrentSession();
       if (session?.user) {
         await this.saveToSupabase(session.user.id, updatedData);
       } else {
@@ -483,14 +561,41 @@ class AuthService {
         return;
       }
 
+      // CRITICAL: Validate session integrity
+      const userId = session.user.id;
+      if (!userId || userId.trim() === '' || userId === 'undefined' || userId === 'null') {
+        console.error('🚨 SECURITY: Invalid user ID in session, aborting sync:', userId);
+        return;
+      }
+
       const localData = await this.getOnboardingData();
       if (Object.keys(localData).length === 0) {
         console.log('📡 No local onboarding data to sync');
         return;
       }
 
-      console.log('🔄 Syncing local onboarding data to Supabase...');
-      await this.saveToSupabase(session.user.id, localData);
+      // Security check: Don't sync if data looks suspicious
+      if (localData.userId && localData.userId !== userId) {
+        console.error('🚨 SECURITY: Local data user ID mismatch!');
+        console.error('- Local data user ID:', localData.userId);
+        console.error('- Session user ID:', userId);
+        console.error('- Clearing potentially corrupt local data');
+        
+        // Clear the suspicious local data
+        await AsyncStorage.removeItem('onboarding_data');
+        return;
+      }
+
+      console.log('🔄 SECURE: Syncing verified local onboarding data to Supabase:', {
+        userId: userId,
+        dataKeys: Object.keys(localData),
+        displayName: localData.displayName,
+        username: localData.username
+      });
+      
+      // Add user ID to local data for future validation
+      const dataWithUserId = { ...localData, userId: userId };
+      await this.saveToSupabase(userId, dataWithUserId);
       
     } catch (error) {
       console.error('❌ Error syncing onboarding data to Supabase:', error);

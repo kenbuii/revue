@@ -1,3 +1,24 @@
+// Polyfills must be loaded first to prevent "window is not defined" errors during builds
+import 'react-native-url-polyfill/auto';
+import { Platform } from 'react-native';
+
+// Additional polyfills for EAS builds
+if (typeof global.window === 'undefined') {
+  global.window = global as any;
+}
+
+// AsyncStorage polyfill for build environment
+if (typeof global.localStorage === 'undefined') {
+  global.localStorage = {
+    getItem: () => null,
+    setItem: () => {},
+    removeItem: () => {},
+    clear: () => {},
+    key: () => null,
+    length: 0
+  };
+}
+
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';

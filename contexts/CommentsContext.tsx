@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useAuth } from './AuthContext';
 import { commentsService, Comment, CreateCommentParams } from '@/lib/commentsService';
 
@@ -103,9 +103,9 @@ export function CommentsProvider({ children }: { children: ReactNode }) {
   };
 
   /**
-   * Load comments for a post
+   * Load comments for a post (memoized to prevent infinite loops)
    */
-  const loadComments = async (postId: string, forceRefresh: boolean = false): Promise<void> => {
+  const loadComments = useCallback(async (postId: string, forceRefresh: boolean = false): Promise<void> => {
     console.log('💬 Loading comments for post:', postId);
 
     // Check cache first (unless force refresh)
@@ -137,12 +137,12 @@ export function CommentsProvider({ children }: { children: ReactNode }) {
         lastFetched: 0,
       });
     }
-  };
+  }, [commentsCache]); // Depend on commentsCache to ensure proper memoization
 
   /**
-   * Create a new comment
+   * Create a new comment (memoized)
    */
-  const createComment = async (params: CreateCommentParams): Promise<{ success: boolean; comment?: Comment; error?: string }> => {
+  const createComment = useCallback(async (params: CreateCommentParams): Promise<{ success: boolean; comment?: Comment; error?: string }> => {
     console.log('✍️ Creating comment for post:', params.post_id);
 
     try {
@@ -171,12 +171,12 @@ export function CommentsProvider({ children }: { children: ReactNode }) {
         error: error instanceof Error ? error.message : 'Failed to create comment',
       };
     }
-  };
+  }, []);
 
   /**
-   * Toggle like on a comment
+   * Toggle like on a comment (memoized)
    */
-  const toggleCommentLike = async (commentId: string, postId: string): Promise<{ success: boolean; error?: string }> => {
+  const toggleCommentLike = useCallback(async (commentId: string, postId: string): Promise<{ success: boolean; error?: string }> => {
     console.log('👍 Toggling like on comment:', commentId);
 
     try {
@@ -202,7 +202,7 @@ export function CommentsProvider({ children }: { children: ReactNode }) {
         error: error instanceof Error ? error.message : 'Failed to toggle comment like',
       };
     }
-  };
+  }, []);
 
   /**
    * Real-time update methods
@@ -340,12 +340,12 @@ export function usePostComments(postId: string) {
   const comments = getPostComments(postId);
   const state = getPostCommentsState(postId);
 
-  // Auto-load comments when hook is used
+  // Auto-load comments when hook is used (with proper dependencies)
   useEffect(() => {
     if (postId) {
       loadComments(postId);
     }
-  }, [postId]);
+  }, [postId, loadComments]); // Fixed: Added loadComments to dependencies
 
   return {
     comments,

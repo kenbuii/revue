@@ -22,17 +22,12 @@ import { mediaSearchService, MediaItem } from '@/lib/mediaService';
 export default function MediaDetailScreen() {
   const router = useRouter();
   
-  // Debug the params to see if there's an issue
-  let params;
-  try {
-    console.log('🔍 About to call useLocalSearchParams...');
-    params = useLocalSearchParams();
-    console.log('✅ useLocalSearchParams successful:', params);
-  } catch (error) {
-    console.error('❌ useLocalSearchParams failed:', error);
-    params = {};
-  }
-  
+  // Enhanced parameter handling
+  const params = useLocalSearchParams();
+  const mediaId = Array.isArray(params.id) ? params.id[0] : params.id || '';
+
+  console.log('🎬 MediaDetailScreen params:', { params, mediaId });
+
   // Safely get bookmarks context with error handling
   let bookmarksContext;
   try {
@@ -63,17 +58,26 @@ export default function MediaDetailScreen() {
   const [communityData, setCommunityData] = useState<MediaCommunityStats | null>(null);
   const [loadingCommunity, setLoadingCommunity] = useState(true);
 
-  // Get media ID from params
-  const mediaId = (params.id as string) || '';
+  // Action states
+  const [bookmarking, setBookmarking] = useState(false);
+  const [sharing, setSharing] = useState(false);
 
-  // Load media data on mount
+  // Enhanced parameter validation
   useEffect(() => {
-    if (mediaId) {
-      loadMediaData();
-    } else {
+    console.log('🔍 Media Detail useEffect triggered:', {
+      mediaId,
+      mediaIdLength: mediaId?.length,
+      mediaIdType: typeof mediaId
+    });
+    
+    if (!mediaId || mediaId.trim() === '') {
+      console.error('❌ No valid media ID provided');
       setLoadingMedia(false);
       setMediaError('No media ID provided');
+      return;
     }
+    
+    loadMediaData();
   }, [mediaId]);
 
   // Load community data when media data is available
@@ -86,6 +90,12 @@ export default function MediaDetailScreen() {
   }, [mediaData]);
 
   const loadMediaData = async () => {
+    if (!mediaId) {
+      setLoadingMedia(false);
+      setMediaError('No media ID provided');
+      return;
+    }
+
     try {
       setLoadingMedia(true);
       setMediaError(null);
@@ -95,10 +105,15 @@ export default function MediaDetailScreen() {
       
       if (data) {
         setMediaData(data);
-        console.log('✅ Media data loaded:', data.title);
+        console.log('✅ Media data loaded:', {
+          id: data.id,
+          title: data.title,
+          type: data.type,
+          hasImage: !!data.image
+        });
       } else {
-        setMediaError('Media not found');
         console.error('❌ Media data not found for ID:', mediaId);
+        setMediaError('Media not found');
       }
     } catch (error) {
       console.error('❌ Error loading media data:', error);
@@ -109,14 +124,26 @@ export default function MediaDetailScreen() {
   };
 
   const loadCommunityData = async () => {
-    if (!mediaData?.id) return;
+    if (!mediaData?.id) {
+      console.log('⚠️ No media data available for community loading');
+      setLoadingCommunity(false);
+      return;
+    }
     
     try {
       setLoadingCommunity(true);
+      console.log('👥 Loading community data for media:', mediaData.id);
+      
       const data = await communityRevuesService.getMediaCommunityData(mediaData.id);
       setCommunityData(data);
+      
+      console.log('✅ Community data loaded:', {
+        totalRevues: data.totalRevues,
+        averageRating: data.averageRating,
+        recentRevuesCount: data.recentRevues?.length || 0
+      });
     } catch (error) {
-      console.error('Error loading community data:', error);
+      console.error('❌ Error loading community data:', error);
       // Set empty data on error to prevent rendering issues
       setCommunityData({
         totalRevues: 0,
@@ -130,17 +157,21 @@ export default function MediaDetailScreen() {
     }
   };
 
-  // Debug logging to help diagnose parameter issues
+  // Enhanced debug logging
   if (__DEV__) {
-    console.log('📱 MediaDetailScreen received params:', {
+    console.log('📱 MediaDetailScreen State:', {
       rawParams: params,
-      mediaId,
+      processedMediaId: mediaId,
       loadingMedia,
-      mediaData: mediaData ? { id: mediaData.id, title: mediaData.title, type: mediaData.type } : null,
+      mediaError,
+      hasMediaData: !!mediaData,
+      mediaTitle: mediaData?.title,
+      loadingCommunity,
+      hasCommunityData: !!communityData,
     });
   }
 
-  // Show loading state
+  // Enhanced loading state
   if (loadingMedia) {
     return (
       <SafeAreaView style={styles.container}>
@@ -151,12 +182,15 @@ export default function MediaDetailScreen() {
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#004D00" />
           <Text style={styles.loadingText}>Loading media details...</Text>
+          {mediaId && (
+            <Text style={styles.loadingSubtext}>Media ID: {mediaId}</Text>
+          )}
         </View>
       </SafeAreaView>
     );
   }
 
-  // Show error state
+  // Enhanced error state
   if (mediaError || !mediaData) {
     return (
       <SafeAreaView style={styles.container}>
@@ -170,8 +204,17 @@ export default function MediaDetailScreen() {
           <Text style={styles.errorMessage}>
             {mediaError || 'The requested media could not be loaded.'}
           </Text>
+          {mediaId && (
+            <Text style={styles.errorDetails}>Media ID: {mediaId}</Text>
+          )}
           <TouchableOpacity style={styles.retryButton} onPress={loadMediaData}>
             <Text style={styles.retryButtonText}>Try Again</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.goBackButton} 
+            onPress={() => router.back()}
+          >
+            <Text style={styles.goBackButtonText}>Go Back</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -179,9 +222,9 @@ export default function MediaDetailScreen() {
   }
 
   // Create a mock post object for bookmark functionality
-  const mockPost = {
+  const createBookmarkPost = () => ({
     id: `media_${mediaData.id}`,
-    user: { name: 'User', avatar: 'https://via.placeholder.com/40' },
+    user: { name: 'System', avatar: 'https://via.placeholder.com/40' },
     media: {
       id: mediaData.id,
       title: mediaData.title,
@@ -195,8 +238,9 @@ export default function MediaDetailScreen() {
     likeCount: 0,
     isBookmarked: true,
     isLiked: false,
-  };
+  });
 
+  const mockPost = createBookmarkPost();
   const isBookmarked = isPostBookmarked(mockPost.id);
 
   const getMediaTypeColor = (type: string) => {
@@ -324,38 +368,76 @@ export default function MediaDetailScreen() {
   };
 
   const handleBookmark = async () => {
+    if (bookmarking || !mediaData) return;
+    
     try {
-      const newBookmarkState = await toggleBookmark(mockPost);
-      console.log('Bookmark toggled:', newBookmarkState);
+      setBookmarking(true);
+      console.log('🔖 Toggling bookmark for media:', mediaData.id);
+      const result = await toggleBookmark(mockPost);
+      console.log('Bookmark result:', result);
     } catch (error) {
-      console.error('Error toggling bookmark:', error);
-      Alert.alert('Error', 'Failed to update bookmark');
+      console.error('❌ Error toggling bookmark:', error);
+      Alert.alert('Error', 'Failed to bookmark. Please try again.');
+    } finally {
+      setBookmarking(false);
     }
   };
 
   const handleCreatePost = () => {
-    console.log('Create post pressed for media:', mediaData.title);
-    router.push({
-      pathname: '/(post_flow)/step3',
-      params: {
-        mediaId: mediaData.id,
-        mediaTitle: mediaData.title,
-        mediaType: mediaData.type,
-        mediaImage: mediaData.image,
-      }
-    });
+    if (loadingMedia || !mediaData || bookmarking || sharing) return;
+    
+    console.log('📝 Creating post for media:', mediaData.id);
+    try {
+      router.push({
+        pathname: '/(post_flow)/step1',
+        params: {
+          mediaId: mediaData.id,
+          title: mediaData.title,
+          type: mediaData.type,
+          creator: mediaData.author || '',
+          image: mediaData.image || '',
+          // Pre-populate to skip directly to step 3 as per step1.tsx logic
+        },
+      });
+    } catch (error) {
+      console.error('❌ Error navigating to create post:', error);
+      Alert.alert('Error', 'Failed to open post creation. Please try again.');
+    }
   };
 
   const handleShare = async () => {
+    if (sharing || !mediaData) return;
+    
     try {
-      const shareContent = {
-        message: `Check out ${mediaData.title} on Revue!`,
-        url: `https://revue.app/media/${mediaData.id}`,
-      };
+      setSharing(true);
+      console.log('📤 Sharing media:', mediaData.title);
       
-      await Share.share(shareContent);
+      const shareOptions = {
+        message: `Check out "${mediaData.title}" on Revue!`,
+        url: `revue://media/${mediaData.id}`, // Deep link for the app
+        title: mediaData.title,
+      };
+
+      if (Platform.OS === 'ios') {
+        await Share.share({
+          message: shareOptions.message,
+          url: shareOptions.url,
+          title: shareOptions.title,
+        });
+      } else {
+        await Share.share({
+          message: `${shareOptions.message} ${shareOptions.url}`,
+          title: shareOptions.title,
+        });
+      }
     } catch (error) {
-      console.error('Share error:', error);
+      console.error('❌ Error sharing:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      if (errorMessage !== 'User did not share') {
+        Alert.alert('Error', 'Failed to share. Please try again.');
+      }
+    } finally {
+      setSharing(false);
     }
   };
 
@@ -365,8 +447,16 @@ export default function MediaDetailScreen() {
         showBackButton={true}
         title={safeString(getCapitalizedType(mediaData.type))}
         rightComponent={
-          <TouchableOpacity onPress={handleShare} style={styles.headerButton}>
-            <Ionicons name="share-outline" size={24} color="#666" />
+          <TouchableOpacity 
+            onPress={handleShare} 
+            style={[styles.headerButton, sharing && styles.disabledButton]}
+            disabled={sharing || loadingMedia}
+          >
+            {sharing ? (
+              <ActivityIndicator size={20} color="#666" />
+            ) : (
+              <Ionicons name="share-outline" size={24} color={sharing ? "#CCC" : "#666"} />
+            )}
           </TouchableOpacity>
         }
       />
@@ -412,22 +502,51 @@ export default function MediaDetailScreen() {
 
         {/* Action Buttons */}
         <View style={styles.actionButtonsContainer}>
-          <TouchableOpacity style={styles.primaryButton} onPress={handleCreatePost}>
-            <Ionicons name="create-outline" size={20} color="white" />
-            <Text style={styles.primaryButtonText}>Create Revue</Text>
+          <TouchableOpacity 
+            style={[
+              styles.primaryButton, 
+              (loadingMedia || bookmarking || sharing) && styles.disabledPrimaryButton
+            ]} 
+            onPress={handleCreatePost}
+            disabled={loadingMedia || bookmarking || sharing}
+          >
+            <Ionicons 
+              name="create-outline" 
+              size={20} 
+              color={(loadingMedia || bookmarking || sharing) ? "#CCC" : "white"} 
+            />
+            <Text style={[
+              styles.primaryButtonText,
+              (loadingMedia || bookmarking || sharing) && styles.disabledPrimaryButtonText
+            ]}>
+              Create Revue
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity 
-            style={[styles.secondaryButton, isBookmarked && styles.bookmarkedButton]} 
+            style={[
+              styles.secondaryButton, 
+              isBookmarked && styles.bookmarkedButton,
+              bookmarking && styles.disabledSecondaryButton
+            ]} 
             onPress={handleBookmark}
+            disabled={bookmarking || loadingMedia}
           >
-            <Ionicons 
-              name={isBookmarked ? "bookmark" : "bookmark-outline"} 
-              size={20} 
-              color={isBookmarked ? "#004D00" : "#666"} 
-            />
-            <Text style={[styles.secondaryButtonText, isBookmarked && styles.bookmarkedText]}>
-              {isBookmarked ? 'Saved' : 'Save'}
+            {bookmarking ? (
+              <ActivityIndicator size={20} color={isBookmarked ? "#004D00" : "#666"} />
+            ) : (
+              <Ionicons 
+                name={isBookmarked ? "bookmark" : "bookmark-outline"} 
+                size={20} 
+                color={isBookmarked ? "#004D00" : "#666"} 
+              />
+            )}
+            <Text style={[
+              styles.secondaryButtonText, 
+              isBookmarked && styles.bookmarkedText,
+              bookmarking && styles.disabledSecondaryButtonText
+            ]}>
+              {bookmarking ? 'Saving...' : (isBookmarked ? 'Saved' : 'Save')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -498,9 +617,24 @@ export default function MediaDetailScreen() {
                   </View>
                 );
               })}
-              <TouchableOpacity style={styles.viewAllButton}>
-                <Text style={styles.viewAllButtonText}>View All Revues</Text>
-                <Ionicons name="chevron-forward" size={16} color="#004D00" />
+              <TouchableOpacity 
+                style={[
+                  styles.viewAllButton,
+                  (loadingCommunity || loadingMedia) && styles.disabledViewAllButton
+                ]}
+                disabled={loadingCommunity || loadingMedia}
+              >
+                <Text style={[
+                  styles.viewAllButtonText,
+                  (loadingCommunity || loadingMedia) && styles.disabledViewAllButtonText
+                ]}>
+                  View All Revues
+                </Text>
+                <Ionicons 
+                  name="chevron-forward" 
+                  size={16} 
+                  color={(loadingCommunity || loadingMedia) ? "#CCC" : "#004D00"} 
+                />
               </TouchableOpacity>
             </View>
           ) : (
@@ -510,8 +644,20 @@ export default function MediaDetailScreen() {
             <Text style={styles.emptyStateSubtitle}>
               Be the first to share your thoughts about "{safeString(mediaData.title)}"
             </Text>
-            <TouchableOpacity style={styles.createFirstButton} onPress={handleCreatePost}>
-              <Text style={styles.createFirstButtonText}>Write First Revue</Text>
+            <TouchableOpacity 
+              style={[
+                styles.createFirstButton,
+                (loadingMedia || bookmarking || sharing) && styles.disabledCreateFirstButton
+              ]} 
+              onPress={handleCreatePost}
+              disabled={loadingMedia || bookmarking || sharing}
+            >
+              <Text style={[
+                styles.createFirstButtonText,
+                (loadingMedia || bookmarking || sharing) && styles.disabledCreateFirstButtonText
+              ]}>
+                Write First Revue
+              </Text>
             </TouchableOpacity>
           </View>
           )}
@@ -769,6 +915,12 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginLeft: 10,
   },
+  loadingSubtext: {
+    color: '#666',
+    fontSize: 14,
+    fontWeight: '500',
+    marginLeft: 10,
+  },
   revuesContainer: {
     padding: 20,
   },
@@ -871,6 +1023,13 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginBottom: 20,
   },
+  errorDetails: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 20,
+  },
   retryButton: {
     backgroundColor: '#004D00',
     paddingHorizontal: 20,
@@ -881,5 +1040,46 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 14,
     fontWeight: '600',
+  },
+  goBackButton: {
+    backgroundColor: '#004D00',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  goBackButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  disabledButton: {
+    opacity: 0.6,
+  },
+  disabledPrimaryButton: {
+    backgroundColor: '#CCCCCC',
+    opacity: 0.7,
+  },
+  disabledPrimaryButtonText: {
+    color: '#999999',
+  },
+  disabledSecondaryButton: {
+    opacity: 0.6,
+    backgroundColor: '#F0F0F0',
+  },
+  disabledSecondaryButtonText: {
+    color: '#CCCCCC',
+  },
+  disabledCreateFirstButton: {
+    backgroundColor: '#CCCCCC',
+    opacity: 0.7,
+  },
+  disabledCreateFirstButtonText: {
+    color: '#999999',
+  },
+  disabledViewAllButton: {
+    opacity: 0.6,
+  },
+  disabledViewAllButtonText: {
+    color: '#CCCCCC',
   },
 });

@@ -59,12 +59,17 @@ export default function Step3DisplayNameScreen() {
   const generateUsername = (name: string): string => {
     if (!name.trim()) return '';
     
-    return name
+    let baseUsername = name
       .toLowerCase()
       .replace(/[^a-z0-9\s]/g, '') // Remove special characters
       .replace(/\s+/g, '_') // Replace spaces with underscores
-      .substring(0, 20) // Limit length
-      + '_'; // Add underscore suffix
+      .substring(0, 15); // Leave room for unique suffix
+    
+    // Add unique suffix to prevent duplicates
+    const timestamp = Date.now().toString().slice(-4); // Last 4 digits of timestamp
+    const randomSuffix = Math.random().toString(36).substring(2, 4); // 2 random chars
+    
+    return `${baseUsername}_${timestamp}${randomSuffix}`;
   };
 
   // Username validation

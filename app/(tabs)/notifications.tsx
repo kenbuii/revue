@@ -251,7 +251,7 @@ export default function NotificationsScreen() {
       <SafeAreaView style={styles.container}>
         <View style={styles.topSpacer} />
         
-        <AppHeader showBackButton={true} />
+        <AppHeader showBackButton={false} />
 
         <FlatList
           data={notifications}

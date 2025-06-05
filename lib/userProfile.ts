@@ -172,6 +172,14 @@ class UserProfileService {
         return [];
       }
 
+      // SECURITY: Validate that we're only accessing current user's data
+      if (userId && session.data.session?.user?.id && userId !== session.data.session.user.id) {
+        console.error('🚨 SECURITY: Attempted to access different user\'s media preferences!');
+        console.error('- Requested user ID:', userId);
+        console.error('- Current session user ID:', session.data.session.user.id);
+        return [];
+      }
+
       console.log('🔄 Fetching user media preferences for:', targetUserId);
       console.log('🔍 Session user ID:', session.data.session?.user?.id);
       console.log('🔍 Provided user ID:', userId);
