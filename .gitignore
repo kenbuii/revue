@@ -31,16 +31,14 @@ yarn-error.*
 
 # local env files
 .env*.local
+.env
 
 # typescript
 *.tsbuildinfo
 
+# Example app folder (if any)
 app-example
-package-lock.json
-package-lock.json
-.env
-package-lock.json
-package.json
-*.json
-package-lock.json
-package.json
+
+# Lock files (optional - some teams prefer to include these)
+# package-lock.json
+
