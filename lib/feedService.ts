@@ -9,6 +9,29 @@ class FeedService {
   private supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
   private supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
+  // Add proper RPC calling method (similar to postService)
+  private async callRPC(functionName: string, params: any = {}) {
+    const session = await supabaseAuth.getSession();
+    const token = session.data.session?.access_token || this.supabaseAnonKey;
+
+    const response = await fetch(`${this.supabaseUrl}/rest/v1/rpc/${functionName}`, {
+      method: 'POST',
+      headers: {
+        'apikey': this.supabaseAnonKey!,
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(params),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`RPC call failed: ${response.status} - ${error}`);
+    }
+
+    return response.json();
+  }
+
   private async makeDirectRequest(endpoint: string, method: string = 'GET', body?: any) {
     const session = await supabaseAuth.getSession();
     const token = session.data.session?.access_token || this.supabaseAnonKey;
@@ -39,10 +62,12 @@ class FeedService {
       const session = await supabaseAuth.getSession();
       const userId = session.data.session?.user?.id;
       
-      // Use RPC function for complex feed logic
-      const posts = await this.makeDirectRequest(
-        `rpc/get_for_you_feed?p_user_id=${userId || 'null'}&p_limit=${limit}&p_offset=${offset}`
-      );
+      // Use proper RPC call with POST method and body params
+      const posts = await this.callRPC('get_for_you_feed', {
+        p_user_id: userId,
+        p_limit: limit,
+        p_offset: offset
+      });
 
       console.log(`✅ Found ${posts.length} posts for For You feed`);
       return posts.map((post: any) => this.transformRPCPostToFeedPost(post));
@@ -66,10 +91,12 @@ class FeedService {
 
       console.log('👥 Fetching Friends + Following feed using RPC...');
       
-      // Use RPC function for friends feed
-      const posts = await this.makeDirectRequest(
-        `rpc/get_friends_feed?p_user_id=${userId}&p_limit=${limit}&p_offset=${offset}`
-      );
+      // Use proper RPC call with POST method and body params
+      const posts = await this.callRPC('get_friends_feed', {
+        p_user_id: userId,
+        p_limit: limit,
+        p_offset: offset
+      });
 
       console.log(`✅ Found ${posts.length} posts for Friends feed`);
       return posts.map((post: any) => this.transformRPCPostToFeedPost(post));

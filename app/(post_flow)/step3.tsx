@@ -18,6 +18,12 @@ import { postService, CreatePostParams } from '@/lib/posts';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserProfile } from '@/contexts/UserProfileContext';
 import { PostDebugger } from '@/lib/postDebug';
+import { router } from 'expo-router';
+
+// Declare global variable for refresh flag (matching the feed)
+declare global {
+  var shouldRefreshFeed: boolean | undefined;
+}
 
 export default function Step3() {
   const params = useLocalSearchParams();
@@ -166,7 +172,7 @@ export default function Step3() {
     return true;
   };
 
-  const handlePost = async () => {
+  const handleSubmit = async () => {
     if (!validateForm()) {
       return;
     }
@@ -177,65 +183,66 @@ export default function Step3() {
     }
 
     setIsSubmitting(true);
-
+    
     try {
-      const createPostParams: CreatePostParams = {
-        // Media information
+      console.log('📝 Creating post with:', {
+        mediaId: params.mediaId,
+        mediaTitle: params.title,
+        mediaType: params.type,
+        mediaYear: params.year,
+        mediaCreator: params.creator,
+        mediaCover: params.image,
+        mediaGenre: params.genre,
+        title: postTitle,
+        content: thoughts,
+        rating: rating,
+        tags: [],
+        location: undefined,
+      });
+
+      const result = await postService.createPost({
         mediaId: params.mediaId as string,
         mediaTitle: params.title as string,
         mediaType: params.type as 'movie' | 'tv' | 'book',
         mediaYear: params.year as string,
-        mediaGenre: params.genre as string,
         mediaCreator: params.creator as string,
         mediaCover: params.image as string,
-        
-        // Post content
-        title: postTitle.trim() || undefined,
-        content: thoughts.trim(),
-        rating: rating > 0 ? rating : undefined,
-        tags: [], // Could be extended later
-        
-        // Location context
-        location: pageNumber.trim() || undefined,
-      };
-
-      console.log('📝 Creating post with:', createPostParams);
-
-      const result = await postService.createPost(createPostParams);
+        mediaGenre: params.genre as string,
+        title: postTitle,
+        content: thoughts,
+        rating: rating,
+        tags: [],
+        location: undefined,
+      });
 
       if (result.success) {
-        // Set global flag to refresh feed when user returns to home
+        console.log('✅ Post created successfully:', result.post?.id);
+        
+        // Set global flag to refresh feed when user returns
         global.shouldRefreshFeed = true;
         
+        // Show success feedback
         Alert.alert(
-          'Success!',
-          'Your revue has been published successfully.',
+          'Post Created!', 
+          'Your review has been published successfully.',
           [
             {
               text: 'View in Feed',
               onPress: () => {
+                // Navigate to feed (will auto-refresh due to global flag)
                 router.push('/(tabs)');
-              },
-            },
-            {
-              text: 'Back to Media',
-              onPress: () => {
-                router.back();
-              },
-            },
-          ],
-          { cancelable: false }
+              }
+            }
+          ]
         );
+        
       } else {
-        throw new Error(result.error || 'Failed to create post');
+        console.error('❌ Post creation failed:', result.error);
+        Alert.alert('Error', result.error || 'Failed to create post. Please try again.');
       }
     } catch (error) {
       console.error('❌ Error creating post:', error);
-      Alert.alert(
-        'Error',
-        'Failed to publish your revue. Please try again.',
-        [{ text: 'OK' }]
-      );
+      Alert.alert('Error', 'Failed to create post. Please check your connection and try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -453,7 +460,7 @@ export default function Step3() {
             
             <TouchableOpacity 
               style={[styles.postButton, isSubmitting && styles.postButtonDisabled]} 
-              onPress={handlePost}
+              onPress={handleSubmit}
               disabled={isSubmitting}
             >
               {isSubmitting ? (

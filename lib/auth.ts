@@ -364,8 +364,18 @@ class AuthService {
         p_contact_sync_enabled: data.contactsSynced || false,
         p_display_name: data.displayName || null,
         p_media_preferences: data.selectedMedia || [],
-        p_onboarding_completed: data.onboarding_completed || false,
+        // FIXED: Only send onboarding_completed if explicitly provided, don't default to false
+        p_onboarding_completed: data.onboarding_completed === true ? true : 
+                               data.onboarding_completed === false ? false : 
+                               undefined, // Don't override existing DB value if not specified
       };
+
+      // Remove undefined values to avoid overriding database values
+      Object.keys(payload).forEach(key => {
+        if (payload[key] === undefined) {
+          delete payload[key];
+        }
+      });
 
       // Note: p_username is NOT in the deployed function, so we'll save it separately
 
