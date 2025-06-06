@@ -81,7 +81,13 @@ class PostService {
   
   private async callRPC(functionName: string, params: any = {}) {
     const session = await supabaseAuth.getSession();
-    const token = session.data.session?.access_token || this.supabaseAnonKey;
+    
+    // FIXED: Ensure we have valid auth token instead of falling back to anon key
+    if (!session.data.session?.access_token) {
+      throw new Error('Authentication required for posts');
+    }
+    
+    const token = session.data.session.access_token;
 
     const response = await fetch(`${this.supabaseUrl}/rest/v1/rpc/${functionName}`, {
       method: 'POST',
@@ -95,15 +101,29 @@ class PostService {
 
     if (!response.ok) {
       const error = await response.text();
-      throw new Error(`RPC call failed: ${response.status} - ${error}`);
+      console.error(`RPC call failed: ${response.status} - ${error}`);
+      throw new Error(`Failed to ${functionName}: ${error}`);
     }
 
-    return response.json();
+    const result = await response.json();
+    
+    // FIXED: Handle null results gracefully
+    if (result === null) {
+      throw new Error(`${functionName} returned null - check authentication context`);
+    }
+
+    return result;
   }
 
   private async makeDirectRequest(endpoint: string, method: string = 'GET', body?: any) {
     const session = await supabaseAuth.getSession();
-    const token = session.data.session?.access_token || this.supabaseAnonKey;
+    
+    // FIXED: Ensure we have valid auth token instead of falling back to anon key
+    if (!session.data.session?.access_token) {
+      throw new Error('Authentication required for posts');
+    }
+    
+    const token = session.data.session.access_token;
 
     const response = await fetch(`${this.supabaseUrl}/rest/v1/${endpoint}`, {
       method,
@@ -118,6 +138,7 @@ class PostService {
 
     if (!response.ok) {
       const error = await response.text();
+      console.error(`Request failed: ${response.status} - ${error}`);
       throw new Error(`Request failed: ${response.status} - ${error}`);
     }
 
@@ -355,6 +376,31 @@ class PostService {
     } catch (error) {
       console.error('❌ Error clearing drafts:', error);
       throw error;
+    }
+  }
+
+  // Get specific post by ID (for post detail page)
+  async getPostById(postId: string): Promise<Post | null> {
+    try {
+      console.log('🔍 Fetching post by ID:', postId);
+      
+      // Use PostgREST to get the specific post with all relationships
+      const posts = await this.makeDirectRequest(
+        `posts?select=*,user_profiles(*),media_items(*)&id=eq.${postId}&is_public=eq.true&limit=1`
+      );
+      
+      if (!posts || posts.length === 0) {
+        console.log('❌ Post not found or not public:', postId);
+        return null;
+      }
+      
+      const post = posts[0];
+      console.log('✅ Post found:', post.id, 'by user:', post.user_profiles?.username);
+      
+      return this.transformPostgRESTToUIPost(post);
+    } catch (error) {
+      console.error('❌ Error fetching post by ID:', error);
+      return null;
     }
   }
 }

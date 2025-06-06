@@ -1,75 +1,47 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, Text, Image, ScrollView, TouchableOpacity, TextInput } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, View, Text, Image, ScrollView, TouchableOpacity, TextInput, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, Stack } from 'expo-router';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AppHeader from '@/components/AppHeader';
-import { samplePosts } from '@/constants/mockData';
+import { postService, Post } from '@/lib/posts';
+import { commentsService, Comment } from '@/lib/commentsService';
 
-// Mock comment data
-const mockComments = [
-  {
-    id: '1',
-    user: { name: 'Alice', avatar: 'https://randomuser.me/api/portraits/women/1.jpg' },
-    content: 'This is such a great review! I totally agree with your thoughts.',
-    timestamp: '2h ago',
-    likeCount: 5,
-    isLiked: false,
-    replies: [
-      {
-        id: '1-1',
-        user: { name: 'Bob', avatar: 'https://randomuser.me/api/portraits/men/1.jpg' },
-        content: 'Same here! Really well written.',
-        timestamp: '1h ago',
-        likeCount: 2,
-        isLiked: false,
-        replyTo: 'Alice'
-      }
-    ]
-  },
-  {
-    id: '2',
-    user: { name: 'Charlie', avatar: 'https://randomuser.me/api/portraits/men/2.jpg' },
-    content: 'Interesting perspective. I had a different take on this part of the story.',
-    timestamp: '3h ago',
-    likeCount: 8,
-    isLiked: true,
-    replies: []
-  }
-];
-
-interface Comment {
-  id: string;
-  user: { name: string; avatar: string };
-  content: string;
-  timestamp: string;
-  likeCount: number;
-  isLiked: boolean;
-  replyTo?: string;
-  replies?: Comment[];
+interface CommentWithReplies extends Comment {
+  replies?: CommentWithReplies[];
 }
 
-function CommentItem({ comment, isReply = false }: { comment: Comment; isReply?: boolean }) {
-  const [isLiked, setIsLiked] = useState(comment.isLiked);
-  const [likeCount, setLikeCount] = useState(comment.likeCount);
+function CommentItem({ comment, isReply = false, onReply }: { 
+  comment: CommentWithReplies; 
+  isReply?: boolean;
+  onReply: (parentId: string) => void;
+}) {
+  const [isLiked, setIsLiked] = useState(comment.is_liked_by_user || false);
+  const [likeCount, setLikeCount] = useState(comment.like_count || 0);
   const [showReplyInput, setShowReplyInput] = useState(false);
   const [replyText, setReplyText] = useState('');
 
-  const handleLike = () => {
-    setIsLiked(!isLiked);
-    setLikeCount(prev => isLiked ? prev - 1 : prev + 1);
+  const handleLike = async () => {
+    try {
+      const result = await commentsService.likeComment(comment.id);
+      if (result.success && typeof result.isLiked === 'boolean') {
+        setIsLiked(result.isLiked);
+        setLikeCount(result.likeCount || 0);
+      }
+    } catch (error) {
+      console.error('Error liking comment:', error);
+    }
   };
 
   const handleReply = () => {
     setShowReplyInput(!showReplyInput);
   };
 
-  const submitReply = () => {
+  const submitReply = async () => {
     if (replyText.trim()) {
-      console.log('Submitting reply:', replyText);
       setReplyText('');
       setShowReplyInput(false);
-      // TODO: Add reply to comments
+      onReply(comment.id);
     }
   };
 
@@ -77,14 +49,11 @@ function CommentItem({ comment, isReply = false }: { comment: Comment; isReply?:
     <View style={[styles.commentContainer, isReply && styles.replyContainer]}>
       {isReply && <View style={styles.replyLine} />}
       <View style={styles.commentContent}>
-        <Image source={{ uri: comment.user.avatar }} style={styles.commentAvatar} />
+        <Image source={{ uri: comment.avatar_url }} style={styles.commentAvatar} />
         <View style={styles.commentBody}>
           <View style={styles.commentHeader}>
-            <Text style={styles.commentUsername}>{comment.user.name}</Text>
-            {comment.replyTo && (
-              <Text style={styles.replyToText}>replying to @{comment.replyTo}</Text>
-            )}
-            <Text style={styles.commentTimestamp}>{comment.timestamp}</Text>
+            <Text style={styles.commentUsername}>{comment.display_name || comment.username}</Text>
+            <Text style={styles.commentTimestamp}>{commentsService.formatCommentTime(comment.created_at)}</Text>
           </View>
           <Text style={styles.commentText}>{comment.content}</Text>
           
@@ -108,7 +77,7 @@ function CommentItem({ comment, isReply = false }: { comment: Comment; isReply?:
             <View style={styles.replyInputContainer}>
               <TextInput
                 style={styles.replyInput}
-                placeholder={`Reply to ${comment.user.name}...`}
+                placeholder={`Reply to ${comment.display_name || comment.username}...`}
                 value={replyText}
                 onChangeText={setReplyText}
                 multiline
@@ -133,7 +102,7 @@ function CommentItem({ comment, isReply = false }: { comment: Comment; isReply?:
 
       {/* Render replies */}
       {comment.replies && comment.replies.map(reply => (
-        <CommentItem key={reply.id} comment={reply} isReply={true} />
+        <CommentItem key={reply.id} comment={reply} isReply={true} onReply={onReply} />
       ))}
     </View>
   );
@@ -141,18 +110,99 @@ function CommentItem({ comment, isReply = false }: { comment: Comment; isReply?:
 
 export default function PostDetailScreen() {
   const { id } = useLocalSearchParams();
+  const [post, setPost] = useState<Post | null>(null);
+  const [comments, setComments] = useState<CommentWithReplies[]>([]);
   const [newComment, setNewComment] = useState('');
-  
-  // Find the post by ID (in real app, this would be an API call)
-  const post = samplePosts.find(p => p.id === id) || samplePosts[0];
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const submitComment = () => {
-    if (newComment.trim()) {
-      console.log('Submitting comment:', newComment);
-      setNewComment('');
-      // TODO: Add comment to post
+  useEffect(() => {
+    if (id && typeof id === 'string') {
+      loadPostData(id);
+    }
+  }, [id]);
+
+  const loadPostData = async (postId: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // FIXED: Use new getPostById method to fetch any public post
+      const foundPost = await postService.getPostById(postId);
+      
+      if (!foundPost) {
+        setError('Post not found');
+        return;
+      }
+
+      setPost(foundPost);
+
+      // Load comments
+      const postComments = await commentsService.getPostComments(postId);
+      
+      // For now, treat all comments as top-level (nested comments would need more complex logic)
+      setComments(postComments as CommentWithReplies[]);
+      
+    } catch (error) {
+      console.error('Error loading post data:', error);
+      setError('Failed to load post data');
+    } finally {
+      setLoading(false);
     }
   };
+
+  const submitComment = async () => {
+    if (newComment.trim() && post) {
+      try {
+        const result = await commentsService.createComment({
+          post_id: post.id,
+          content: newComment.trim(),
+        });
+
+        if (result.success && result.comment) {
+          setComments(prev => [result.comment as CommentWithReplies, ...prev]);
+          setNewComment('');
+        } else {
+          console.error('Failed to create comment:', result.error);
+        }
+      } catch (error) {
+        console.error('Error submitting comment:', error);
+      }
+    }
+  };
+
+  const handleReply = async (parentCommentId: string) => {
+    // For now, just refresh comments to show new reply
+    if (post) {
+      const updatedComments = await commentsService.getPostComments(post.id);
+      setComments(updatedComments as CommentWithReplies[]);
+    }
+  };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <AppHeader showBackButton={true} />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#004D00" />
+          <Text style={styles.loadingText}>Loading post...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (error || !post) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <AppHeader showBackButton={true} />
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{error || 'Post not found'}</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -180,8 +230,24 @@ export default function PostDetailScreen() {
           
           <Text style={styles.postContent}>{post.content}</Text>
 
+          {post.rating && (
+            <View style={styles.ratingContainer}>
+              <Text style={styles.ratingLabel}>Rating:</Text>
+              <View style={styles.ratingStars}>
+                {[1, 2, 3, 4, 5].map(star => (
+                  <Ionicons
+                    key={star}
+                    name={star <= post.rating! ? "star" : "star-outline"}
+                    size={16}
+                    color="#FFD700"
+                  />
+                ))}
+              </View>
+            </View>
+          )}
+
           <View style={styles.postStats}>
-            <Text style={styles.statText}>{post.commentCount} comments</Text>
+            <Text style={styles.statText}>{comments.length} comments</Text>
             <Text style={styles.statText}>{post.likeCount} likes</Text>
           </View>
         </View>
@@ -209,10 +275,13 @@ export default function PostDetailScreen() {
 
         {/* Comments Thread */}
         <View style={styles.commentsSection}>
-          <Text style={styles.commentsTitle}>Comments</Text>
-          {mockComments.map(comment => (
-            <CommentItem key={comment.id} comment={comment} />
+          <Text style={styles.commentsTitle}>Comments ({comments.length})</Text>
+          {comments.map(comment => (
+            <CommentItem key={comment.id} comment={comment} onReply={handleReply} />
           ))}
+          {comments.length === 0 && (
+            <Text style={styles.noCommentsText}>No comments yet. Be the first to comment!</Text>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -381,11 +450,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginRight: 8,
   },
-  replyToText: {
-    color: '#666',
-    fontSize: 12,
-    marginRight: 8,
-  },
   commentTimestamp: {
     color: '#666',
     fontSize: 12,
@@ -449,5 +513,45 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 14,
     fontWeight: '600',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: '#004D00',
+    fontSize: 18,
+    fontWeight: '600',
+    marginTop: 12,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorText: {
+    color: '#FF6B6B',
+    fontSize: 18,
+    fontWeight: '600',
+    marginTop: 12,
+  },
+  ratingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  ratingLabel: {
+    color: '#666',
+    fontSize: 14,
+    marginRight: 8,
+  },
+  ratingStars: {
+    flexDirection: 'row',
+  },
+  noCommentsText: {
+    color: '#666',
+    fontSize: 14,
+    textAlign: 'center',
   },
 }); 

@@ -133,14 +133,12 @@ export function UserProfileProvider({ children }: UserProfileProviderProps) {
     
     try {
       console.log('🔄 Refreshing media preferences...');
+      
       const mediaData = await userProfileService.getUserMediaPreferences();
-      console.log('🎬 Media data received in context:', {
-        length: mediaData.length,
-        data: mediaData,
-        firstItem: mediaData[0]
-      });
+      
+      console.log(`✅ Media preferences loaded: ${mediaData.length} items`);
       setMediaPreferences(mediaData);
-      console.log('✅ Media preferences set in context state, new length:', mediaData.length);
+      
     } catch (error) {
       console.error('❌ Error refreshing media preferences:', error);
       setMediaError(error instanceof Error ? error.message : 'Failed to load media preferences');

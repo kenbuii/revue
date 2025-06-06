@@ -37,17 +37,17 @@ export default function ProfileScreen() {
 
   // Load user's recent posts
   useEffect(() => {
-    if (isAuthenticated && profile?.id) {
+    if (isAuthenticated && profile?.user_id) {
       loadRecentRevues();
     }
-  }, [isAuthenticated, profile?.id]);
+  }, [isAuthenticated, profile?.user_id]);
 
   const loadRecentRevues = async () => {
     try {
       setLoadingRevues(true);
       console.log('📋 Loading user recent revues...');
       
-      const userPosts = await feedService.getUserPosts(profile?.id, 10); // Load last 10 posts
+      const userPosts = await feedService.getUserPosts(profile?.user_id, 10); // Load last 10 posts
       setRecentRevues(userPosts);
       
       console.log(`✅ Loaded ${userPosts.length} recent revues for user`);
@@ -171,12 +171,6 @@ export default function ProfileScreen() {
     }
   };
 
-  // Debug function to force media preferences refresh
-  const forceRefreshMedia = async () => {
-    console.log('🔄 FORCE REFRESH: Manual media preferences refresh triggered');
-    await refreshMediaPreferences();
-  };
-
   if (loadingProfile) {
     return (
       <SafeAreaView style={styles.container}>
@@ -251,9 +245,6 @@ export default function ProfileScreen() {
               </View>
             </View>
             <View style={styles.headerButtons}>
-              {/* <TouchableOpacity style={styles.debugButton} onPress={forceRefreshMedia}>
-                <Feather name="refresh-cw" size={20} color="#FF6B35" />
-              </TouchableOpacity> */}
               <TouchableOpacity style={styles.editButton} onPress={handleEditProfile}>
                 <Feather name="edit-2" size={20} color="#004D00" />
               </TouchableOpacity>
@@ -770,12 +761,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#F2EFE6',
     borderRadius: 8,
     marginTop: 8,
-  },
-  debugButton: {
-    padding: 8,
-    backgroundColor: '#FFF5F5',
-    borderRadius: 8,
-    marginLeft: 8,
   },
   sectionHeader: {
     flexDirection: 'row',

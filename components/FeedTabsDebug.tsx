@@ -11,7 +11,7 @@ export interface FeedTabsRef {
   refreshFriendsFeed: () => Promise<void>;
 }
 
-const FeedTabs = forwardRef<FeedTabsRef, {}>((props, ref) => {
+const FeedTabsDebug = forwardRef<FeedTabsRef, {}>((props, ref) => {
   const [activeTab, setActiveTab] = useState<TabType>('forYou');
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -21,6 +21,7 @@ const FeedTabs = forwardRef<FeedTabsRef, {}>((props, ref) => {
   const [hasMoreForYou, setHasMoreForYou] = useState(true);
   const [hasMoreFriends, setHasMoreFriends] = useState(true);
   const [lastLoadTime, setLastLoadTime] = useState(0);
+  const [scrollMetrics, setScrollMetrics] = useState({ contentHeight: 0, scrollY: 0, screenHeight: 0 });
   const scrollViewRef = useRef<ScrollView>(null);
   const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -43,12 +44,15 @@ const FeedTabs = forwardRef<FeedTabsRef, {}>((props, ref) => {
       setForYouPosts(forYouData);
       setFriendsPosts(friendsData);
       
-      // FIXED: Better pagination logic - only assume more if we got EXACTLY the limit
-      setHasMoreForYou(forYouData.length === 20);
-      setHasMoreFriends(friendsData.length === 20);
+      // Enhanced logging for pagination states
+      const hasMoreForYou = forYouData.length >= 20;
+      const hasMoreFriends = friendsData.length >= 20;
+      
+      setHasMoreForYou(hasMoreForYou);
+      setHasMoreFriends(hasMoreFriends);
       
       console.log(`✅ Loaded ${forYouData.length} For You posts and ${friendsData.length} Friends posts`);
-      console.log(`📊 HasMore: ForYou=${forYouData.length === 20}, Friends=${friendsData.length === 20}`);
+      console.log(`📊 Pagination state: hasMoreForYou=${hasMoreForYou}, hasMoreFriends=${hasMoreFriends}`);
     } catch (error) {
       console.error('❌ Error loading initial feed data:', error);
     } finally {
@@ -61,7 +65,7 @@ const FeedTabs = forwardRef<FeedTabsRef, {}>((props, ref) => {
       console.log('🔄 Refreshing For You feed...');
       const refreshedPosts = await feedService.refreshFeed('forYou');
       setForYouPosts(refreshedPosts);
-      setHasMoreForYou(refreshedPosts.length === 20);
+      setHasMoreForYou(refreshedPosts.length >= 20);
       console.log(`✅ For You feed refreshed with ${refreshedPosts.length} posts`);
     } catch (error) {
       console.error('❌ Error refreshing For You feed:', error);
@@ -74,7 +78,7 @@ const FeedTabs = forwardRef<FeedTabsRef, {}>((props, ref) => {
       console.log('🔄 Refreshing Friends feed...');
       const refreshedPosts = await feedService.refreshFeed('friends');
       setFriendsPosts(refreshedPosts);
-      setHasMoreFriends(refreshedPosts.length === 20);
+      setHasMoreFriends(refreshedPosts.length >= 20);
       console.log(`✅ Friends feed refreshed with ${refreshedPosts.length} posts`);
     } catch (error) {
       console.error('❌ Error refreshing Friends feed:', error);
@@ -94,19 +98,24 @@ const FeedTabs = forwardRef<FeedTabsRef, {}>((props, ref) => {
   const deduplicatePosts = (existingPosts: FeedPost[], newPosts: FeedPost[]): FeedPost[] => {
     const existingIds = new Set(existingPosts.map(post => post.id));
     const uniqueNewPosts = newPosts.filter(post => !existingIds.has(post.id));
+    console.log(`🔗 Deduplication: ${existingPosts.length} existing + ${newPosts.length} new = ${uniqueNewPosts.length} unique new posts`);
     return [...existingPosts, ...uniqueNewPosts];
   };
 
   const loadMorePosts = async () => {
-    // Throttle calls - prevent multiple simultaneous loads
     const now = Date.now();
+    const hasMore = activeTab === 'forYou' ? hasMoreForYou : hasMoreFriends;
+    const currentPosts = activeTab === 'forYou' ? forYouPosts : friendsPosts;
+    
+    console.log(`🚀 loadMorePosts called: activeTab=${activeTab}, hasMore=${hasMore}, currentCount=${currentPosts.length}, loadingMore=${loadingMore}, timeSinceLastLoad=${now - lastLoadTime}ms`);
+    
+    // Throttle calls - prevent multiple simultaneous loads
     if (loadingMore || (now - lastLoadTime) < 1000) {
       console.log('⏳ Throttling load more request');
       return;
     }
 
     // Check if we have more posts to load
-    const hasMore = activeTab === 'forYou' ? hasMoreForYou : hasMoreFriends;
     if (!hasMore) {
       console.log('📄 No more posts available for', activeTab);
       return;
@@ -115,24 +124,24 @@ const FeedTabs = forwardRef<FeedTabsRef, {}>((props, ref) => {
     try {
       setLoadingMore(true);
       setLastLoadTime(now);
-      const currentPosts = activeTab === 'forYou' ? forYouPosts : friendsPosts;
-      console.log(`🔄 Loading more ${activeTab} posts... (current: ${currentPosts.length}, offset: ${currentPosts.length})`);
+      console.log(`🔄 Loading more ${activeTab} posts... (offset: ${currentPosts.length})`);
       
       const morePosts = await feedService.loadMorePosts(activeTab, currentPosts.length);
-      console.log(`📦 Received ${morePosts.length} more posts`);
+      console.log(`📦 Received ${morePosts.length} more posts from service`);
       
       if (morePosts.length > 0) {
         if (activeTab === 'forYou') {
-          const newPostsList = deduplicatePosts(forYouPosts, morePosts);
-          setForYouPosts(newPostsList);
-          // FIXED: Only hasMore if we got exactly the requested amount (20)
-          setHasMoreForYou(morePosts.length === 20);
-          console.log(`✅ For You posts: ${forYouPosts.length} → ${newPostsList.length} (hasMore: ${morePosts.length === 20})`);
+          const newPosts = deduplicatePosts(forYouPosts, morePosts);
+          setForYouPosts(newPosts);
+          const newHasMore = morePosts.length >= 20;
+          setHasMoreForYou(newHasMore);
+          console.log(`✅ For You posts updated: ${forYouPosts.length} → ${newPosts.length}, hasMore: ${newHasMore}`);
         } else {
-          const newPostsList = deduplicatePosts(friendsPosts, morePosts);
-          setFriendsPosts(newPostsList);
-          setHasMoreFriends(morePosts.length === 20);
-          console.log(`✅ Friends posts: ${friendsPosts.length} → ${newPostsList.length} (hasMore: ${morePosts.length === 20})`);
+          const newPosts = deduplicatePosts(friendsPosts, morePosts);
+          setFriendsPosts(newPosts);
+          const newHasMore = morePosts.length >= 20;
+          setHasMoreFriends(newHasMore);
+          console.log(`✅ Friends posts updated: ${friendsPosts.length} → ${newPosts.length}, hasMore: ${newHasMore}`);
         }
       } else {
         // No more posts available
@@ -150,16 +159,31 @@ const FeedTabs = forwardRef<FeedTabsRef, {}>((props, ref) => {
     }
   };
 
-  // Handle scroll for infinite loading
+  // Enhanced scroll handler with detailed logging
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
-    const paddingToBottom = 100; // INCREASED from 20 to 100 for easier triggering
+    const paddingToBottom = 20;
     
-    // Check if user is near bottom
-    const isCloseToBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom;
+    const currentScrollY = Math.round(contentOffset.y);
+    const currentContentHeight = Math.round(contentSize.height);
+    const currentScreenHeight = Math.round(layoutMeasurement.height);
+    const distanceFromBottom = currentContentHeight - (currentScrollY + currentScreenHeight);
+    const isCloseToBottom = distanceFromBottom <= paddingToBottom;
+    
+    // Update metrics for debugging
+    setScrollMetrics({
+      contentHeight: currentContentHeight,
+      scrollY: currentScrollY,
+      screenHeight: currentScreenHeight
+    });
+    
+    // Log scroll events periodically (every 100px scrolled)
+    if (Math.abs(currentScrollY - scrollMetrics.scrollY) > 100) {
+      console.log(`📜 Scroll: y=${currentScrollY}, contentH=${currentContentHeight}, screenH=${currentScreenHeight}, distFromBottom=${distanceFromBottom}, closeToBottom=${isCloseToBottom}`);
+    }
     
     if (isCloseToBottom) {
-      console.log(`🎯 Near bottom detected! Triggering loadMorePosts... (${Math.round(contentOffset.y)}/${Math.round(contentSize.height)})`);
+      console.log(`🎯 Close to bottom detected! Triggering loadMorePosts...`);
       loadMorePosts();
     }
   };
@@ -172,6 +196,7 @@ const FeedTabs = forwardRef<FeedTabsRef, {}>((props, ref) => {
   }));
 
   const handleTabPress = (tab: TabType) => {
+    console.log(`🔄 Tab switched to: ${tab}`);
     setActiveTab(tab);
     // Scroll to top when switching tabs
     scrollViewRef.current?.scrollTo({ y: 0, animated: true });
@@ -216,6 +241,22 @@ const FeedTabs = forwardRef<FeedTabsRef, {}>((props, ref) => {
     );
   };
 
+  const renderDebugInfo = () => {
+    const currentPosts = getCurrentPosts();
+    const hasMore = activeTab === 'forYou' ? hasMoreForYou : hasMoreFriends;
+    
+    return (
+      <View style={styles.debugContainer}>
+        <Text style={styles.debugText}>
+          📊 {activeTab}: {currentPosts.length} posts, hasMore: {hasMore ? 'YES' : 'NO'}
+        </Text>
+        <Text style={styles.debugText}>
+          📜 Scroll: {scrollMetrics.scrollY}/{scrollMetrics.contentHeight} (h: {scrollMetrics.screenHeight})
+        </Text>
+      </View>
+    );
+  };
+
   const renderEmptyState = (tabType: TabType) => {
     return (
       <View style={styles.emptyContainer}>
@@ -250,6 +291,7 @@ const FeedTabs = forwardRef<FeedTabsRef, {}>((props, ref) => {
 
     return (
       <>
+        {renderDebugInfo()}
         {currentPosts.map((post) => (
           <PostCard key={post.id} post={post} />
         ))}
@@ -285,7 +327,7 @@ const FeedTabs = forwardRef<FeedTabsRef, {}>((props, ref) => {
         </TouchableOpacity>
       </View>
 
-      {/* Feed Content - Fixed scroll throttling */}
+      {/* Feed Content - Enhanced with scroll debugging */}
       <ScrollView
         ref={scrollViewRef}
         style={styles.feedContainer}
@@ -298,7 +340,7 @@ const FeedTabs = forwardRef<FeedTabsRef, {}>((props, ref) => {
           />
         }
         onScroll={handleScroll}
-        scrollEventThrottle={100} // REDUCED from 400 to 100 for more responsive detection
+        scrollEventThrottle={16} // More frequent scroll events for debugging
         showsVerticalScrollIndicator={false}
       >
         {renderFeedContent()}
@@ -307,9 +349,9 @@ const FeedTabs = forwardRef<FeedTabsRef, {}>((props, ref) => {
   );
 });
 
-FeedTabs.displayName = 'FeedTabs';
+FeedTabsDebug.displayName = 'FeedTabsDebug';
 
-export default FeedTabs;
+export default FeedTabsDebug;
 
 const styles = StyleSheet.create({
   container: {
@@ -348,6 +390,19 @@ const styles = StyleSheet.create({
   },
   feedContainer: {
     flex: 1,
+  },
+  debugContainer: {
+    backgroundColor: '#f0f8ff',
+    padding: 10,
+    margin: 10,
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: '#004D00',
+  },
+  debugText: {
+    fontSize: 12,
+    color: '#004D00',
+    fontFamily: 'LibreBaskerville_400Regular',
   },
   loadingContainer: {
     flex: 1,
@@ -414,4 +469,4 @@ const styles = StyleSheet.create({
   bottomSpacer: {
     height: 50,
   },
-});
+}); 

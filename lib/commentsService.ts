@@ -29,7 +29,12 @@ class CommentsService {
    */
   private async callRPC(functionName: string, params: any = {}) {
     const session = await supabaseAuth.getSession();
-    const token = session.data.session?.access_token || this.supabaseAnonKey;
+    
+    if (!session.data.session?.access_token) {
+      throw new Error('Authentication required for comments');
+    }
+    
+    const token = session.data.session.access_token;
 
     const response = await fetch(`${this.supabaseUrl}/rest/v1/rpc/${functionName}`, {
       method: 'POST',
@@ -43,10 +48,17 @@ class CommentsService {
 
     if (!response.ok) {
       const error = await response.text();
-      throw new Error(`RPC call failed: ${response.status} - ${error}`);
+      console.error(`RPC call failed: ${response.status} - ${error}`);
+      throw new Error(`Failed to ${functionName}: ${error}`);
     }
 
-    return response.json();
+    const result = await response.json();
+    
+    if (result === null) {
+      throw new Error(`${functionName} returned null - check authentication context`);
+    }
+
+    return result;
   }
 
   /**

@@ -2,7 +2,7 @@ import { supabaseAuth } from './supabase';
 
 // Types for user profile data
 export interface UserProfile {
-  id: string;
+  user_id: string;
   username: string | null;
   display_name: string | null;
   bio: string | null;
@@ -55,7 +55,12 @@ class UserProfileService {
     }
 
     const session = await supabaseAuth.getSession();
-    const token = session.data.session?.access_token || this.supabaseAnonKey;
+    
+    if (!session.data.session?.access_token) {
+      throw new Error('Authentication required for user profile');
+    }
+    
+    const token = session.data.session.access_token;
 
     const url = `${this.supabaseUrl}/rest/v1/${endpoint}`;
     const requestOptions = {
@@ -107,7 +112,12 @@ class UserProfileService {
    */
   private async callRPC(functionName: string, params: any = {}) {
     const session = await supabaseAuth.getSession();
-    const token = session.data.session?.access_token || this.supabaseAnonKey;
+    
+    if (!session.data.session?.access_token) {
+      throw new Error('Authentication required for user profile');
+    }
+    
+    const token = session.data.session.access_token;
 
     const response = await fetch(`${this.supabaseUrl}/rest/v1/rpc/${functionName}`, {
       method: 'POST',
@@ -121,10 +131,17 @@ class UserProfileService {
 
     if (!response.ok) {
       const error = await response.text();
-      throw new Error(`RPC call failed: ${response.status} - ${error}`);
+      console.error(`RPC call failed: ${response.status} - ${error}`);
+      throw new Error(`Failed to ${functionName}: ${error}`);
     }
 
-    return response.json();
+    const result = await response.json();
+    
+    if (result === null) {
+      throw new Error(`${functionName} returned null - check authentication context`);
+    }
+
+    return result;
   }
 
   /**
@@ -173,19 +190,36 @@ class UserProfileService {
       }
 
       console.log('🔄 Fetching user media preferences for:', targetUserId);
-      console.log('🔍 Session user ID:', session.data.session?.user?.id);
-      console.log('🔍 Provided user ID:', userId);
-      console.log('🔍 Using target user ID:', targetUserId);
 
-      const preferences = await this.callRPC('get_user_media_preferences', {
-        p_user_id: targetUserId
-      });
+      // UPDATED: Use direct PostgREST query as primary method instead of RPC
+      try {
+        const preferences = await this.makeSupabaseRequest(
+          `user_media_preferences?user_id=eq.${targetUserId}&select=media_id,title,media_type,year,image_url,description,source&order=created_at.asc`
+        );
 
-      console.log('✅ User media preferences fetched:', preferences.length, 'items');
-      console.log('🎬 Raw preferences data:', preferences);
-      console.log('🎬 First preference structure:', preferences[0]);
-      
-      return preferences as MediaPreference[];
+        console.log('✅ User media preferences fetched via PostgREST:', preferences.length, 'items');
+        console.log('🎬 Raw preferences data:', preferences);
+        
+        return preferences.map((pref: any) => ({
+          media_id: pref.media_id,
+          title: pref.title,
+          media_type: pref.media_type,
+          year: pref.year,
+          image_url: pref.image_url,
+          description: pref.description,
+          source: pref.source
+        })) as MediaPreference[];
+      } catch (directQueryError) {
+        console.warn('❌ Direct PostgREST query failed, trying RPC fallback:', directQueryError);
+        
+        // Fallback to RPC function if direct query fails
+        const preferences = await this.callRPC('get_user_media_preferences', {
+          p_user_id: targetUserId
+        });
+
+        console.log('✅ User media preferences fetched via RPC fallback:', preferences.length, 'items');
+        return preferences as MediaPreference[];
+      }
     } catch (error) {
       console.error('❌ Error fetching user media preferences:', error);
       return [];
@@ -237,7 +271,7 @@ class UserProfileService {
       console.log('🔄 Updating user profile:', updates);
 
       await this.makeSupabaseRequest(
-        `user_profiles?id=eq.${userId}`,
+        `user_profiles?user_id=eq.${userId}`,
         {
           method: 'PATCH',
           body: JSON.stringify({
@@ -273,7 +307,13 @@ class UserProfileService {
       console.log('🔄 Uploading profile picture for user:', targetUserId);
 
       const fileName = `${targetUserId}-${Date.now()}.jpg`;
-      const token = session.data.session?.access_token || this.supabaseAnonKey;
+      
+      // FIXED: Ensure we have valid auth token instead of falling back to anon key
+      if (!session.data.session?.access_token) {
+        throw new Error('Authentication required for file upload');
+      }
+      
+      const token = session.data.session.access_token;
 
       // Upload to Supabase Storage
       const formData = new FormData();

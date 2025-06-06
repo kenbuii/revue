@@ -12,7 +12,13 @@ class FeedService {
   // Add proper RPC calling method (similar to postService)
   private async callRPC(functionName: string, params: any = {}) {
     const session = await supabaseAuth.getSession();
-    const token = session.data.session?.access_token || this.supabaseAnonKey;
+    
+    // FIXED: Ensure we have valid auth token instead of falling back to anon key
+    if (!session.data.session?.access_token) {
+      throw new Error('Authentication required for feed');
+    }
+    
+    const token = session.data.session.access_token;
 
     const response = await fetch(`${this.supabaseUrl}/rest/v1/rpc/${functionName}`, {
       method: 'POST',
@@ -26,15 +32,29 @@ class FeedService {
 
     if (!response.ok) {
       const error = await response.text();
-      throw new Error(`RPC call failed: ${response.status} - ${error}`);
+      console.error(`RPC call failed: ${response.status} - ${error}`);
+      throw new Error(`Failed to ${functionName}: ${error}`);
     }
 
-    return response.json();
+    const result = await response.json();
+    
+    // FIXED: Handle null results gracefully
+    if (result === null) {
+      throw new Error(`${functionName} returned null - check authentication context`);
+    }
+
+    return result;
   }
 
   private async makeDirectRequest(endpoint: string, method: string = 'GET', body?: any) {
     const session = await supabaseAuth.getSession();
-    const token = session.data.session?.access_token || this.supabaseAnonKey;
+    
+    // FIXED: Ensure we have valid auth token instead of falling back to anon key
+    if (!session.data.session?.access_token) {
+      throw new Error('Authentication required for feed');
+    }
+    
+    const token = session.data.session.access_token;
 
     const response = await fetch(`${this.supabaseUrl}/rest/v1/${endpoint}`, {
       method,
@@ -48,6 +68,7 @@ class FeedService {
 
     if (!response.ok) {
       const error = await response.text();
+      console.error(`Request failed: ${response.status} - ${error}`);
       throw new Error(`Request failed: ${response.status} - ${error}`);
     }
 
@@ -58,6 +79,10 @@ class FeedService {
   async getForYouFeed(limit: number = 20, offset: number = 0): Promise<FeedPost[]> {
     try {
       console.log('📰 Fetching For You feed using RPC...');
+      
+      // TEMPORARY: Force fallback to debug the issue
+      console.log('🚨 TEMPORARILY USING POSTGREST FALLBACK FOR DEBUGGING');
+      return this.getForYouFeedFallback(limit, offset);
       
       const session = await supabaseAuth.getSession();
       const userId = session.data.session?.user?.id;
@@ -81,6 +106,10 @@ class FeedService {
   // HYBRID APPROACH: Use RPC for friends feed
   async getFriendsFeed(limit: number = 20, offset: number = 0): Promise<FeedPost[]> {
     try {
+      // TEMPORARY: Force fallback to debug the issue
+      console.log('🚨 TEMPORARILY USING POSTGREST FALLBACK FOR DEBUGGING');
+      return this.getFriendsFeedFallback(limit, offset);
+      
       const session = await supabaseAuth.getSession();
       const userId = session.data.session?.user?.id;
 
@@ -124,7 +153,7 @@ class FeedService {
       const posts = await this.makeDirectRequest(
         `posts?select=*,user_profiles(*),media_items(*)`
         + `&user_id=eq.${targetUserId}`
-        + `&visibility=eq.public`
+        + `&is_public=eq.true`
         + `&order=created_at.desc`
         + `&limit=${limit}`
         + `&offset=${offset}`
@@ -223,13 +252,14 @@ class FeedService {
       
       const posts = await this.makeDirectRequest(
         `posts?select=*,user_profiles(*),media_items(*)`
-        + `&visibility=eq.public`
+        + `&is_public=eq.true`
         + `&user_profiles.onboarding_completed=eq.true`
         + `&order=created_at.desc`
         + `&limit=${limit}`
         + `&offset=${offset}`
       );
 
+      console.log(`📊 PostgREST fallback returned ${posts.length} posts`);
       return posts.map((post: any) => this.transformPostgRESTPostToFeedPost(post));
     } catch (error) {
       console.error('❌ PostgREST fallback also failed:', error);
@@ -244,13 +274,14 @@ class FeedService {
       
       const posts = await this.makeDirectRequest(
         `posts?select=*,user_profiles(*),media_items(*)`
-        + `&visibility=eq.public`
+        + `&is_public=eq.true`
         + `&user_profiles.onboarding_completed=eq.true`
         + `&order=created_at.desc`
         + `&limit=${limit}`
         + `&offset=${offset}`
       );
 
+      console.log(`📊 PostgREST fallback returned ${posts.length} posts`);
       return posts.map((post: any) => this.transformPostgRESTPostToFeedPost(post));
     } catch (error) {
       console.error('❌ PostgREST fallback also failed:', error);
