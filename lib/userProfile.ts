@@ -143,7 +143,7 @@ class UserProfileService {
       console.log('🔄 Fetching user profile for:', targetUserId);
 
       const profiles = await this.makeSupabaseRequest(
-        `user_profiles?id=eq.${targetUserId}&select=*`
+        `user_profiles?user_id=eq.${targetUserId}&select=*`
       );
 
       if (profiles.length === 0) {

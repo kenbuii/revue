@@ -170,12 +170,10 @@ class PostService {
       // Prepare post data
       const postData = {
         user_id: userId,
-        media_id: mediaId,
+        media_item_id: mediaId,
         title: params.title,
         content: params.content,
         rating: params.rating ? Math.round(params.rating) : undefined,
-        content_type: 'review',
-        tags: params.tags || [],
         location_context: params.location,
         is_public: true,
       };

@@ -421,7 +421,7 @@ class AuthService {
 
       console.log('💾 Saving username directly to user_profiles table...', { userId, username });
 
-      const response = await fetch(`${supabaseUrl}/rest/v1/user_profiles?id=eq.${userId}`, {
+      const response = await fetch(`${supabaseUrl}/rest/v1/user_profiles?user_id=eq.${userId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
