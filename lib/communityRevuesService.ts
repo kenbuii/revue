@@ -98,6 +98,39 @@ class CommunityRevuesService {
   }
 
   /**
+   * Safe string helper to prevent React Native text rendering errors
+   */
+  private safeString(value: any, fallback: string = ''): string {
+    if (value === null || value === undefined) return fallback;
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number') return value.toString();
+    if (typeof value === 'boolean') return value.toString();
+    return String(value);
+  }
+
+  /**
+   * Transform raw revue data with safe string handling
+   */
+  private transformRevueData(revue: any): CommunityRevue {
+    return {
+      id: this.safeString(revue.id),
+      user: {
+        id: this.safeString(revue.user_id),
+        name: this.safeString(revue.user_name, 'Anonymous'),
+        avatar: this.safeString(revue.user_avatar, 'https://via.placeholder.com/40'),
+        username: this.safeString(revue.user_username, 'user'),
+      },
+      content: this.safeString(revue.content, ''),
+      rating: typeof revue.rating === 'number' ? revue.rating : undefined,
+      createdAt: this.safeString(revue.created_at),
+      likeCount: Number(revue.like_count) || 0,
+      commentCount: Number(revue.comment_count) || 0,
+      mediaId: this.safeString(revue.media_id, ''),
+      mediaTitle: this.safeString(revue.media_title, 'Unknown Title'),
+    };
+  }
+
+  /**
    * Fetch community stats and recent revues for a specific media item
    */
   async getMediaCommunityData(mediaId: string, limit: number = 10): Promise<MediaCommunityStats> {
@@ -110,48 +143,45 @@ class CommunityRevuesService {
 
       console.log(`🔍 Fetching community data for media: ${mediaId}`);
 
-      // Get community stats using RPC function
-      const statsResult = await this.callRPC('get_media_community_stats', {
+      // Get community stats using RPC function with error handling
+      let statsResult;
+      try {
+        statsResult = await this.callRPC('get_media_community_stats', {
         p_media_id: mediaId
       });
-
       console.log('📊 Stats result:', statsResult);
+      } catch (error) {
+        console.warn('⚠️ Stats RPC failed, using defaults:', error);
+        statsResult = {};
+      }
 
-      // Get recent revues using RPC function
-      const revuesResult = await this.callRPC('get_media_recent_revues', {
+      // Get recent revues using RPC function with error handling
+      let revuesResult;
+      try {
+        revuesResult = await this.callRPC('get_media_recent_revues', {
         p_media_id: mediaId,
         p_limit: limit,
         p_offset: 0
       });
-
       console.log('📝 Revues result:', revuesResult);
+      } catch (error) {
+        console.warn('⚠️ Revues RPC failed, using empty array:', error);
+        revuesResult = [];
+      }
 
-      // Transform the revues data
-      const revues: CommunityRevue[] = (revuesResult || []).map((revue: any) => ({
-        id: revue.id,
-        user: {
-          id: revue.user_id,
-          name: revue.user_name || 'Anonymous',
-          avatar: revue.user_avatar || 'https://via.placeholder.com/40',
-          username: revue.user_username || 'user',
-        },
-        content: revue.content || '',
-        rating: revue.rating,
-        createdAt: revue.created_at,
-        likeCount: revue.like_count || 0,
-        commentCount: revue.comment_count || 0,
-        mediaId: mediaId,
-        mediaTitle: 'Unknown Title', // This could be enhanced with media data
-      }));
+      // Transform the revues data with safe string handling
+      const revues: CommunityRevue[] = (revuesResult || []).map((revue: any) => 
+        this.transformRevueData(revue)
+      );
 
       console.log(`✅ Found ${revues.length} revues for media ${mediaId}`);
 
       return {
-        totalRevues: statsResult?.totalRevues || 0,
-        averageRating: statsResult?.averageRating || 0,
-        readingCount: statsResult?.readingCount || 0,
-        wantToReadCount: statsResult?.wantToReadCount || 0,
-        completedCount: statsResult?.completedCount || 0,
+        totalRevues: Number(statsResult?.totalRevues) || 0,
+        averageRating: Number(statsResult?.averageRating) || 0,
+        readingCount: Number(statsResult?.readingCount) || 0,
+        wantToReadCount: Number(statsResult?.wantToReadCount) || 0,
+        completedCount: Number(statsResult?.completedCount) || 0,
         recentRevues: revues,
       };
 
@@ -178,15 +208,15 @@ class CommunityRevuesService {
       });
 
       return (result || []).map((user: any) => ({
-        userId: user.user_id,
-        userName: user.user_name || 'Anonymous',
-        userUsername: user.user_username || 'user',
-        userAvatar: user.user_avatar || 'https://via.placeholder.com/40',
+        userId: this.safeString(user.user_id),
+        userName: this.safeString(user.user_name, 'Anonymous'),
+        userUsername: this.safeString(user.user_username, 'user'),
+        userAvatar: this.safeString(user.user_avatar, 'https://via.placeholder.com/40'),
         additionalData: {
-          postId: user.post_id,
-          contentSnippet: user.content_snippet,
-          rating: user.rating,
-          revuedAt: user.revued_at,
+          postId: this.safeString(user.post_id),
+          contentSnippet: this.safeString(user.content_snippet, ''),
+          rating: typeof user.rating === 'number' ? user.rating : undefined,
+          revuedAt: this.safeString(user.revued_at),
         }
       }));
 
@@ -210,13 +240,13 @@ class CommunityRevuesService {
       });
 
       return (result || []).map((user: any) => ({
-        userId: user.user_id,
-        userName: user.user_name || 'Anonymous',
-        userUsername: user.user_username || 'user',
-        userAvatar: user.user_avatar || 'https://via.placeholder.com/40',
+        userId: this.safeString(user.user_id),
+        userName: this.safeString(user.user_name, 'Anonymous'),
+        userUsername: this.safeString(user.user_username, 'user'),
+        userAvatar: this.safeString(user.user_avatar, 'https://via.placeholder.com/40'),
         additionalData: {
-          status: user.status,
-          startedReading: user.started_reading,
+          status: this.safeString(user.status, 'reading'),
+          startedReading: this.safeString(user.started_reading),
         }
       }));
 
@@ -240,13 +270,13 @@ class CommunityRevuesService {
       });
 
       return (result || []).map((user: any) => ({
-        userId: user.user_id,
-        userName: user.user_name || 'Anonymous',
-        userUsername: user.user_username || 'user',
-        userAvatar: user.user_avatar || 'https://via.placeholder.com/40',
+        userId: this.safeString(user.user_id),
+        userName: this.safeString(user.user_name, 'Anonymous'),
+        userUsername: this.safeString(user.user_username, 'user'),
+        userAvatar: this.safeString(user.user_avatar, 'https://via.placeholder.com/40'),
         additionalData: {
-          source: user.source, // 'bookmark' or 'preference'
-          addedAt: user.added_at,
+          source: this.safeString(user.source, 'bookmark'),
+          addedAt: this.safeString(user.added_at),
         }
       }));
 
@@ -267,22 +297,7 @@ class CommunityRevuesService {
         p_offset: offset
       });
 
-      return (result || []).map((revue: any) => ({
-        id: revue.id,
-        user: {
-          id: revue.user_id,
-          name: revue.user_name || 'Anonymous',
-          avatar: revue.user_avatar || 'https://via.placeholder.com/40',
-          username: revue.user_username || 'user',
-        },
-        content: revue.content || '',
-        rating: revue.rating,
-        createdAt: revue.created_at,
-        likeCount: revue.like_count || 0,
-        commentCount: revue.comment_count || 0,
-        mediaId: mediaId,
-        mediaTitle: 'Unknown Title',
-      }));
+      return (result || []).map((revue: any) => this.transformRevueData(revue));
 
     } catch (error) {
       console.error('❌ Error fetching more revues:', error);
@@ -299,7 +314,7 @@ class CommunityRevuesService {
       // In production, you might want a dedicated search function
       const allRevues = await this.getMoreRevues(mediaId, 0, limit * 2);
       
-      const searchLower = searchQuery.toLowerCase();
+      const searchLower = this.safeString(searchQuery).toLowerCase();
       return allRevues.filter(revue => 
         revue.content.toLowerCase().includes(searchLower) ||
         revue.user.name.toLowerCase().includes(searchLower)

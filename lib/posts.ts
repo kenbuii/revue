@@ -127,27 +127,23 @@ class PostService {
   // Create or update media item in database
   private async ensureMediaItem(params: CreatePostParams): Promise<string> {
     try {
-      // Use the new upsert function instead of direct insertion
-      const mediaId = params.mediaId || `${params.mediaType}_${Date.now()}`;
-      
-      const result = await this.callRPC('upsert_media_item', {
-        p_media_id: mediaId,
+      // Use the new RPC function to ensure media item exists
+      const result = await this.callRPC('ensure_media_item_exists', {
+        p_media_id: params.mediaId || `${params.mediaType}_${Date.now()}`,
         p_title: params.mediaTitle,
         p_media_type: params.mediaType,
-        p_year: params.mediaYear,
-        p_image_url: params.mediaCover,
+        p_author: params.mediaCreator,
         p_description: '', // Could be extended later
-        p_creator: params.mediaCreator,
-        p_genre: params.mediaGenre,
-        p_source: 'popular',
-        p_original_api_id: null,
+        p_cover_image_url: params.mediaCover,
+        p_external_id: null,
+        p_metadata: {}
       });
 
-      console.log('✅ Media item upserted successfully:', result);
+      console.log('✅ Media item ensured successfully:', result);
       return result; // The function returns the media_id
     } catch (error) {
-      console.warn('❌ Failed to upsert media item, using generated ID:', error);
-      // If upsert fails, return a generated ID
+      console.warn('❌ Failed to ensure media item exists, using generated ID:', error);
+      // If RPC fails, return a generated ID
       return params.mediaId || `${params.mediaType}_${Date.now()}`;
     }
   }
@@ -196,7 +192,7 @@ class PostService {
     }
   }
 
-  // Get user's posts
+  // Get user's posts - HYBRID APPROACH: Use PostgREST for simple queries
   async getUserPosts(userId?: string, limit: number = 20): Promise<Post[]> {
     try {
       const targetUserId = userId || (await supabaseAuth.getSession()).data.session?.user?.id;
@@ -205,29 +201,85 @@ class PostService {
         return [];
       }
 
-      const posts = await this.makeDirectRequest(`posts?user_id=eq.${targetUserId}&limit=${limit}&order=created_at.desc`);
+      console.log('📋 Fetching user posts using PostgREST...');
       
-      return posts.map((post: any) => this.transformToPost(post));
+      // Use PostgREST for simple user posts query (now that FK constraint is fixed)
+      const posts = await this.makeDirectRequest(
+        `posts?select=*,user_profiles(*),media_items(*)&user_id=eq.${targetUserId}&limit=${limit}&order=created_at.desc`
+      );
+      
+      return posts.map((post: any) => this.transformPostgRESTToUIPost(post));
     } catch (error) {
       console.error('❌ Error fetching user posts:', error);
       return [];
     }
   }
 
-  // Get posts for a specific media item
+  // Get posts for a specific media item - HYBRID APPROACH: Use RPC for optimal performance
   async getMediaPosts(mediaId: string, limit: number = 10): Promise<Post[]> {
     try {
-      const posts = await this.makeDirectRequest(`posts?media_id=eq.${mediaId}&is_public=eq.true&limit=${limit}&order=created_at.desc`);
+      console.log('🎬 Fetching media posts using RPC...');
       
-      return posts.map((post: any) => this.transformToPost(post));
+      // Use RPC function for media posts
+      const posts = await this.callRPC('get_media_posts', {
+        p_media_id: mediaId,
+        p_limit: limit,
+        p_offset: 0
+      });
+      
+      return posts.map((post: any) => this.transformRPCPostToUIPost(post));
     } catch (error) {
-      console.error('❌ Error fetching media posts:', error);
+      console.error('❌ Error fetching media posts with RPC, trying fallback:', error);
+      return this.getMediaPostsFallback(mediaId, limit);
+    }
+  }
+
+  // Fallback for media posts using PostgREST
+  private async getMediaPostsFallback(mediaId: string, limit: number): Promise<Post[]> {
+    try {
+      console.log('⚠️ Using PostgREST fallback for media posts...');
+      
+      // Use PostgREST with proper relationships (now that FK constraint exists)
+      const posts = await this.makeDirectRequest(
+        `posts?select=*,user_profiles(*),media_items(*)&media_item_id=eq.${mediaId}&is_public=eq.true&limit=${limit}&order=created_at.desc`
+      );
+      
+      return posts.map((post: any) => this.transformPostgRESTToUIPost(post));
+    } catch (error) {
+      console.error('❌ Error fetching media posts with fallback:', error);
       return [];
     }
   }
 
-  // Transform database post to UI post
-  private transformToPost(dbPost: any): Post {
+  // Transform RPC post result to UI post format
+  private transformRPCPostToUIPost(dbPost: any): Post {
+    return {
+      id: dbPost.id,
+      user: {
+        name: dbPost.display_name || dbPost.username || 'Unknown User',
+        avatar: dbPost.avatar_url || '',
+      },
+      media: {
+        id: '', // Not included in media posts RPC
+        title: 'Media Post', // This is for media-specific posts
+        type: 'unknown',
+        cover: '',
+      },
+      date: dbPost.created_at,
+      title: dbPost.title,
+      contentType: 'text',
+      content: dbPost.content,
+      textContent: dbPost.content,
+      commentCount: dbPost.comment_count || 0,
+      likeCount: dbPost.like_count || 0,
+      isBookmarked: false,
+      isLiked: false,
+      rating: dbPost.rating,
+    };
+  }
+
+  // Transform PostgREST post result to UI post format
+  private transformPostgRESTToUIPost(dbPost: any): Post {
     return {
       id: dbPost.id,
       user: {
@@ -235,14 +287,14 @@ class PostService {
         avatar: dbPost.user_profiles?.avatar_url || '',
       },
       media: {
-        id: dbPost.media_id,
+        id: dbPost.media_item_id || '',
         title: dbPost.media_items?.title || 'Unknown Media',
         type: dbPost.media_items?.media_type || 'unknown',
-        cover: dbPost.media_items?.image_url || '',
+        cover: dbPost.media_items?.cover_image_url || '',
       },
       date: dbPost.created_at,
       title: dbPost.title,
-      contentType: dbPost.content_type === 'image' ? 'image' : 'text',
+      contentType: 'text',
       content: dbPost.content,
       textContent: dbPost.content,
       commentCount: dbPost.comment_count || 0,

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 
 interface Media {
@@ -36,9 +36,30 @@ export default function PostHeader({
     if (onMediaPress) {
       onMediaPress();
     } else {
-      // Default behavior - navigate to media detail
-      console.log('Media pressed, navigating to media detail page');
-      router.push(`/media/${media.id}`);
+      // Enhanced navigation - pass all available media data like Search does
+      console.log('📱 Media pressed, navigating to media detail page for:', media.title);
+      console.log('🎯 Passing media data:', {
+        id: media.id,
+        title: media.title,
+        type: media.type,
+        image: media.cover
+      });
+      
+      router.push({
+        pathname: '/media/[id]' as const,
+        params: {
+          id: media.id,
+          title: media.title,
+          type: media.type,
+          year: '', // Not available in feed, but media detail can handle empty
+          image: media.cover || '', // 🎯 Pass the cover image!
+          description: '', // Not available in feed
+          rating: '', // Not available in feed  
+          author: '', // Not available in feed
+          // Flag to indicate this came from feed
+          source: 'feed'
+        },
+      });
     }
   };
 
@@ -64,11 +85,11 @@ export default function PostHeader({
         </TouchableOpacity>
       </View>
       
-      {/* Media Info Section */}
+      {/* Enhanced Media Info Section - Now clearly clickable */}
       <TouchableOpacity 
         onPress={handleMediaPress}
         style={styles.mediaInfoContainer}
-        activeOpacity={0.7}
+        activeOpacity={0.8}
       >
         <View style={styles.mediaInfo}>
           <View style={styles.mediaTextContainer}>
@@ -77,7 +98,15 @@ export default function PostHeader({
               {date} • {media.type} {media.progress}
             </Text>
           </View>
+          
+          <View style={styles.mediaCoverContainer}>
           <Image source={{ uri: media.cover }} style={styles.mediaCover} />
+            
+            {/* Clickable indicator */}
+            <View style={styles.clickIndicator}>
+              <Ionicons name="chevron-forward" size={16} color="#004D00" />
+            </View>
+          </View>
         </View>
       </TouchableOpacity>
     </View>
@@ -124,9 +153,20 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   mediaInfoContainer: {
-    backgroundColor: '#F5F5F5',
-    borderRadius: 8,
-    padding: 8,
+    backgroundColor: '#F8F8F8', // Slightly lighter to show it's interactive
+    borderRadius: 12, // More rounded for modern look
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#E8E4D8',
+    // Add subtle shadow for depth
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   mediaInfo: {
     flexDirection: 'row',
@@ -135,22 +175,48 @@ const styles = StyleSheet.create({
   },
   mediaTextContainer: {
     flex: 1,
-    marginRight: 8,
+    marginRight: 12,
   },
   mediaTitle: {
     color: '#004D00',
     fontWeight: 'bold',
     fontSize: 16,
     fontFamily: 'LibreBaskerville_700Bold',
-    marginBottom: 2,
+    marginBottom: 4,
   },
   mediaDetails: {
     color: '#666',
     fontSize: 14,
   },
+  mediaCoverContainer: {
+    position: 'relative',
+    alignItems: 'center',
+  },
   mediaCover: {
     width: 50,
     height: 70,
-    borderRadius: 5,
+    borderRadius: 6,
+  },
+  clickIndicator: {
+    position: 'absolute',
+    bottom: -8,
+    right: -8,
+    backgroundColor: 'white',
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#004D00',
+    // Add shadow to make it pop
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 3,
   },
 }); 

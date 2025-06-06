@@ -18,6 +18,20 @@ import AppHeader from '@/components/AppHeader';
 import { useBookmarks } from '@/contexts/BookmarksContext';
 import { communityRevuesService, MediaCommunityStats } from '@/lib/communityRevuesService';
 import { mediaSearchService, MediaItem } from '@/lib/mediaService';
+import { supabaseAuth } from '@/lib/supabase';
+
+interface MediaData {
+  id: string;
+  title: string;
+  media_type: string;
+  author?: string;
+  description?: string;
+  cover_image_url?: string;
+  publication_date?: string;
+  average_rating?: number;
+  total_ratings?: number;
+  source?: 'database' | 'params' | 'api';
+}
 
 export default function MediaDetailScreen() {
   const router = useRouter();
@@ -55,7 +69,7 @@ export default function MediaDetailScreen() {
   const { isBookmarked: isPostBookmarked, toggleBookmark } = bookmarksContext;
 
   // Media data state
-  const [mediaData, setMediaData] = useState<MediaItem | null>(null);
+  const [mediaData, setMediaData] = useState<MediaData | null>(null);
   const [loadingMedia, setLoadingMedia] = useState(true);
   const [mediaError, setMediaError] = useState<string | null>(null);
 
@@ -66,15 +80,52 @@ export default function MediaDetailScreen() {
   // Get media ID from params
   const mediaId = (params.id as string) || '';
 
-  // Load media data on mount
+  // Extract param values to stabilize them (prevent infinite re-renders)
+  const paramTitle = params.title as string;
+  const paramImage = params.image as string;
+  const paramAuthor = params.author as string;
+  const paramType = params.type as string;
+  const paramDescription = params.description as string;
+  const paramYear = params.year as string;
+  const paramRating = params.rating as string;
+
+  // Enhanced: Try to construct media data from URL params first
   useEffect(() => {
     if (mediaId) {
-      loadMediaData();
+      // First, try to use URL params if we have them (from Search or enhanced Feed navigation)
+      // Use extracted param values to avoid infinite re-renders
+      const hasUrlParams = paramTitle || paramImage || paramAuthor;
+      
+      if (hasUrlParams) {
+        console.log('📋 Using URL params for media data');
+        const mediaFromParams: MediaData = {
+          id: mediaId,
+          title: paramTitle || 'Unknown Title',
+          media_type: paramType || 'unknown',
+          author: paramAuthor || undefined,
+          description: paramDescription || undefined,
+          cover_image_url: paramImage || undefined,
+          publication_date: paramYear ? `${paramYear}-01-01` : undefined,
+          average_rating: paramRating ? Number(paramRating) : undefined,
+          total_ratings: undefined,
+          source: 'params'
+        };
+        
+        setMediaData(mediaFromParams);
+        setLoadingMedia(false);
+        setMediaError(null);
+        
+        console.log('✅ Media data set from URL params:', mediaFromParams.title);
+      } else {
+        // Fallback to database lookup
+        console.log('📊 No URL params, falling back to database lookup');
+        loadMediaDetails();
+      }
     } else {
       setLoadingMedia(false);
       setMediaError('No media ID provided');
     }
-  }, [mediaId]);
+  }, [mediaId]); // FIXED: Only depend on mediaId, not params object
 
   // Load community data when media data is available
   useEffect(() => {
@@ -85,24 +136,74 @@ export default function MediaDetailScreen() {
     }
   }, [mediaData]);
 
-  const loadMediaData = async () => {
+  const loadMediaDetails = async () => {
     try {
       setLoadingMedia(true);
       setMediaError(null);
       
-      console.log('🎬 Fetching media data for ID:', mediaId);
-      const data = await mediaSearchService.getMediaById(mediaId);
+      console.log('📱 Loading media details from database for:', mediaId);
       
-      if (data) {
-        setMediaData(data);
-        console.log('✅ Media data loaded:', data.title);
-      } else {
-        setMediaError('Media not found');
-        console.error('❌ Media data not found for ID:', mediaId);
+      // Make direct request to get media details
+      const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+      const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+      
+      const session = await supabaseAuth.getSession();
+      const token = session.data.session?.access_token || supabaseAnonKey;
+
+      const response = await fetch(`${supabaseUrl}/rest/v1/media_items?id=eq.${mediaId}`, {
+        headers: {
+          'apikey': supabaseAnonKey!,
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to load media: ${response.status}`);
       }
-    } catch (error) {
-      console.error('❌ Error loading media data:', error);
-      setMediaError(error instanceof Error ? error.message : 'Failed to load media data');
+
+      const data = await response.json();
+      
+      if (data && data.length > 0) {
+        setMediaData({ ...data[0], source: 'database' });
+        console.log('✅ Media details loaded from database:', data[0].title);
+      } else {
+        // Final fallback: Try to use partial URL params even if incomplete
+        if (paramTitle) {
+          console.log('⚠️ Database lookup failed, using partial URL params as fallback');
+          const fallbackMedia: MediaData = {
+            id: mediaId,
+            title: paramTitle || 'Unknown Title',
+            media_type: paramType || 'unknown',
+            author: paramAuthor || undefined,
+            description: paramDescription || undefined,
+            cover_image_url: paramImage || undefined,
+            source: 'params'
+          };
+          setMediaData(fallbackMedia);
+        } else {
+          setMediaError('Media not found in database and no URL params available');
+        }
+      }
+    } catch (err: any) {
+      console.error('❌ Error loading media details:', err);
+      
+      // Final fallback: Try URL params if database fails
+      if (paramTitle) {
+        console.log('🔄 Database error, falling back to URL params');
+        const fallbackMedia: MediaData = {
+          id: mediaId,
+          title: paramTitle || 'Unknown Title',
+          media_type: paramType || 'unknown',
+          author: paramAuthor || undefined,
+          description: paramDescription || undefined,
+          cover_image_url: paramImage || undefined,
+          source: 'params'
+        };
+        setMediaData(fallbackMedia);
+      } else {
+        setMediaError(err.message || 'Failed to load media details');
+      }
     } finally {
       setLoadingMedia(false);
     }
@@ -132,11 +233,17 @@ export default function MediaDetailScreen() {
 
   // Debug logging to help diagnose parameter issues
   if (__DEV__) {
-    console.log('📱 MediaDetailScreen received params:', {
+    console.log('📱 MediaDetailScreen state:', {
       rawParams: params,
       mediaId,
       loadingMedia,
-      mediaData: mediaData ? { id: mediaData.id, title: mediaData.title, type: mediaData.type } : null,
+      mediaData: mediaData ? { 
+        id: mediaData.id, 
+        title: mediaData.title, 
+        type: mediaData.media_type,
+        hasImage: !!mediaData.cover_image_url,
+        source: mediaData.source
+      } : null,
     });
   }
 
@@ -170,7 +277,7 @@ export default function MediaDetailScreen() {
           <Text style={styles.errorMessage}>
             {mediaError || 'The requested media could not be loaded.'}
           </Text>
-          <TouchableOpacity style={styles.retryButton} onPress={loadMediaData}>
+          <TouchableOpacity style={styles.retryButton} onPress={loadMediaDetails}>
             <Text style={styles.retryButtonText}>Try Again</Text>
           </TouchableOpacity>
         </View>
@@ -185,8 +292,8 @@ export default function MediaDetailScreen() {
     media: {
       id: mediaData.id,
       title: mediaData.title,
-      type: mediaData.type,
-      cover: mediaData.image || 'https://via.placeholder.com/120x160',
+      type: mediaData.media_type,
+      cover: mediaData.cover_image_url || 'https://via.placeholder.com/120x160',
     },
     date: new Date().toISOString(),
     contentType: 'text' as const,
@@ -336,12 +443,16 @@ export default function MediaDetailScreen() {
   const handleCreatePost = () => {
     console.log('Create post pressed for media:', mediaData.title);
     router.push({
-      pathname: '/(post_flow)/step3',
+      pathname: '/(post_flow)/step1',
       params: {
-        mediaId: mediaData.id,
-        mediaTitle: mediaData.title,
-        mediaType: mediaData.type,
-        mediaImage: mediaData.image,
+        preselectedMedia: JSON.stringify({
+          id: mediaData.id,
+          title: mediaData.title,
+          type: mediaData.media_type,
+          author: mediaData.author,
+          image: mediaData.cover_image_url,
+          description: mediaData.description,
+        })
       }
     });
   };
@@ -359,11 +470,31 @@ export default function MediaDetailScreen() {
     }
   };
 
+  const getMediaTypeEmoji = (type: string) => {
+    switch (type) {
+      case 'movie': return '🎬';
+      case 'tv': 
+      case 'tv_show': return '📺';
+      case 'book': return '📚';
+      case 'audiobook': return '🎧';
+      case 'podcast': return '🎙️';
+      default: return '🎭';
+    }
+  };
+
+  const formatMediaType = (type: string) => {
+    switch (type) {
+      case 'tv_show': return 'TV Show';
+      case 'audiobook': return 'Audiobook';
+      default: return type.charAt(0).toUpperCase() + type.slice(1);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <AppHeader 
         showBackButton={true}
-        title={safeString(getCapitalizedType(mediaData.type))}
+        title={safeString(getCapitalizedType(mediaData.media_type))}
         rightComponent={
           <TouchableOpacity onPress={handleShare} style={styles.headerButton}>
             <Ionicons name="share-outline" size={24} color="#666" />
@@ -375,11 +506,13 @@ export default function MediaDetailScreen() {
         {/* Hero Section */}
         <View style={styles.heroSection}>
           <View style={styles.imageContainer}>
-            {mediaData.image ? (
-              <Image source={{ uri: mediaData.image }} style={styles.mediaImage} />
+            {mediaData.cover_image_url ? (
+              <Image source={{ uri: mediaData.cover_image_url }} style={styles.mediaImage} />
             ) : (
-              <View style={[styles.imagePlaceholder, { backgroundColor: getMediaTypeColor(mediaData.type) }]}>
-                <Ionicons name={getMediaTypeIcon(mediaData.type) as any} size={48} color="white" />
+              <View style={[styles.imagePlaceholder, { backgroundColor: getMediaTypeColor(mediaData.media_type) }]}>
+                <Text style={styles.placeholderEmoji}>
+                  {getMediaTypeEmoji(mediaData.media_type)}
+                </Text>
               </View>
             )}
           </View>
@@ -388,25 +521,26 @@ export default function MediaDetailScreen() {
             <Text style={styles.mediaTitle} numberOfLines={3}>{safeString(mediaData.title)}</Text>
             
             <View style={styles.metaContainer}>
-              <View style={[styles.typeTag, { backgroundColor: getMediaTypeColor(mediaData.type) }]}>
-                <Text style={styles.mediaType}>{safeString(mediaData.type, 'movie').toUpperCase()}</Text>
+              <View style={[styles.typeTag, { backgroundColor: getMediaTypeColor(mediaData.media_type) }]}>
+                <Text style={styles.mediaType}>{safeString(formatMediaType(mediaData.media_type))}</Text>
               </View>
-              {mediaData.year ? (
-                <Text style={styles.mediaYear}>{safeString(mediaData.year)}</Text>
-              ) : null}
+              {mediaData.publication_date && (
+                <Text style={styles.mediaYear}>{safeString(new Date(mediaData.publication_date).getFullYear())}</Text>
+              )}
             </View>
 
-            {mediaData.author ? (
+            {mediaData.author && (
               <Text style={styles.author}>by {safeString(mediaData.author)}</Text>
-            ) : null}
+            )}
 
-            {mediaData.rating ? (
+            {mediaData.average_rating && mediaData.average_rating > 0 && (
               <View style={styles.ratingContainer}>
-                <Ionicons name="star" size={16} color="#FFD700" />
-                <Text style={styles.rating}>{mediaData.rating.toFixed(1)}</Text>
-                <Text style={styles.ratingOutOf}>/ 10</Text>
+                <Text style={styles.rating}>⭐ {safeString(mediaData.average_rating.toFixed(1))}</Text>
+                {mediaData.total_ratings && (
+                  <Text style={styles.ratingCount}>({safeString(mediaData.total_ratings.toString())} rating{safeString(mediaData.total_ratings !== 1 ? 's' : '')})</Text>
+                )}
               </View>
-            ) : null}
+            )}
           </View>
         </View>
 
@@ -414,7 +548,7 @@ export default function MediaDetailScreen() {
         <View style={styles.actionButtonsContainer}>
           <TouchableOpacity style={styles.primaryButton} onPress={handleCreatePost}>
             <Ionicons name="create-outline" size={20} color="white" />
-            <Text style={styles.primaryButtonText}>Create Revue</Text>
+            <Text style={styles.primaryButtonText}>Write a Review</Text>
           </TouchableOpacity>
 
           <TouchableOpacity 
@@ -433,12 +567,12 @@ export default function MediaDetailScreen() {
         </View>
 
         {/* Description Section */}
-        {mediaData.description ? (
+        {mediaData.description && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>About</Text>
             <Text style={styles.description}>{safeString(mediaData.description)}</Text>
           </View>
-        ) : null}
+        )}
 
         {/* Stats Section */}
         <View style={styles.section}>
@@ -479,7 +613,6 @@ export default function MediaDetailScreen() {
                       </View>
                       {hasRating ? (
                         <View style={styles.revueRating}>
-                          <Ionicons name="star" size={12} color="#FFD700" />
                           <Text style={styles.ratingText}>{revue.rating!.toFixed(1)}</Text>
                         </View>
                       ) : null}
@@ -624,7 +757,7 @@ const styles = StyleSheet.create({
     marginLeft: 4,
     fontWeight: '600',
   },
-  ratingOutOf: {
+  ratingCount: {
     fontSize: 14,
     color: '#999',
     marginLeft: 2,
@@ -881,5 +1014,9 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 14,
     fontWeight: '600',
+  },
+  placeholderEmoji: {
+    fontSize: 48,
+    color: 'white',
   },
 });

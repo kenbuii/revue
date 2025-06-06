@@ -4,267 +4,167 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  TextInput,
   ScrollView,
-  Modal,
-  FlatList,
   Alert,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from 'react-native-safe-area-context';
 import KeyboardDismissWrapper from '@/components/KeyboardDismissWrapper';
-
-type MediaFields = {
-  [key: string]: {
-    creatorLabel: string;
-    uploadLabel: string;
-    genreOptions: string[];
-  };
-};
-
-const mediaFields: MediaFields = {
-  book: {
-    creatorLabel: "author:",
-    uploadLabel: "Upload book cover",
-    genreOptions: [
-      "fantasy",
-      "romance",
-      "mystery",
-      "sci-fi",
-      "non-fiction",
-      "biography",
-      "thriller",
-      "literary fiction",
-      "other",
-    ],
-  },
-  movie: {
-    creatorLabel: "director:",
-    uploadLabel: "Upload movie poster",
-    genreOptions: [
-      "action",
-      "comedy",
-      "drama",
-      "horror",
-      "sci-fi",
-      "thriller",
-      "romance",
-      "documentary",
-      "animation",
-      "other",
-    ],
-  },
-  tv: {
-    creatorLabel: "creator:",
-    uploadLabel: "Upload show poster",
-    genreOptions: [
-      "drama",
-      "comedy",
-      "thriller",
-      "sci-fi",
-      "reality",
-      "documentary",
-      "anime",
-      "crime",
-      "fantasy",
-      "other",
-    ],
-  },
-};
-
-// Generate years from 1900 to current year
-const currentYear = new Date().getFullYear();
-const years = Array.from({ length: currentYear - 1899 }, (_, i) => String(currentYear - i));
-
-type DropdownProps = {
-  label: string;
-  value: string;
-  options: string[];
-  onSelect: (value: string) => void;
-};
-
-function Dropdown({ label, value, options, onSelect }: DropdownProps) {
-  const [isVisible, setIsVisible] = useState(false);
-
-  return (
-    <>
-      <Text style={styles.label}>{label}</Text>
-      <TouchableOpacity 
-        style={styles.pickerButton}
-        onPress={() => setIsVisible(true)}
-      >
-        <Text style={styles.pickerText}>{value}</Text>
-        <Ionicons name="chevron-down" size={20} color="#2F4F4F" />
-      </TouchableOpacity>
-
-      <Modal
-        visible={isVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setIsVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{label}</Text>
-              <TouchableOpacity 
-                style={styles.closeButton}
-                onPress={() => setIsVisible(false)}
-              >
-                <Ionicons name="close" size={24} color="#2F4F4F" />
-              </TouchableOpacity>
-            </View>
-            
-            <FlatList
-              data={options}
-              keyExtractor={(item) => item}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={[
-                    styles.optionItem,
-                    item === value && styles.selectedOption,
-                  ]}
-                  onPress={() => {
-                    onSelect(item);
-                    setIsVisible(false);
-                  }}
-                >
-                  <Text 
-                    style={[
-                      styles.optionText,
-                      item === value && styles.selectedOptionText,
-                    ]}
-                  >
-                    {item}
-                  </Text>
-                </TouchableOpacity>
-              )}
-            />
-          </View>
-        </View>
-      </Modal>
-    </>
-  );
-}
+import MediaSearchInput from '@/components/MediaSearchInput';
+import { MediaItem } from '@/lib/mediaService';
 
 export default function Step2() {
   const { type } = useLocalSearchParams();
   const router = useRouter();
-  const [title, setTitle] = useState("");
-  const [creator, setCreator] = useState("");
-  const [year, setYear] = useState(String(currentYear));
-  const [genre, setGenre] = useState(
-    mediaFields[type as keyof MediaFields]?.genreOptions[0] || ""
-  );
+  const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null);
+  const [showConfirmation, setShowConfirmation] = useState(false);
 
-  const fields = mediaFields[type as keyof MediaFields];
+  const mediaType = type as 'movie' | 'tv' | 'book';
 
-  const validateForm = () => {
-    if (!title.trim()) {
-      Alert.alert('Missing Information', `Please enter the ${type} title.`);
-      return false;
+  const getMediaTypeLabel = (type: string) => {
+    switch (type) {
+      case 'movie': return 'Movie';
+      case 'tv': return 'TV Show';
+      case 'book': return 'Book';
+      default: return 'Media';
     }
-    if (!creator.trim()) {
-      Alert.alert('Missing Information', `Please enter the ${fields.creatorLabel.replace(':', '')}.`);
-      return false;
-    }
-    return true;
   };
 
-  const handleNext = () => {
-    if (!validateForm()) {
+  const getMediaTypeEmoji = (type: string) => {
+    switch (type) {
+      case 'movie': return '🎬';
+      case 'tv': return '📺';
+      case 'book': return '📚';
+      default: return '🎭';
+    }
+  };
+
+  const handleMediaSelect = (media: MediaItem) => {
+    console.log('📋 Media selected in step2:', media.title);
+    setSelectedMedia(media);
+    setShowConfirmation(true);
+  };
+
+  const handleContinue = () => {
+    if (!selectedMedia) {
+      Alert.alert('No Media Selected', 'Please select a media item to continue.');
       return;
     }
 
+    // Navigate to step 3 with pre-filled media data
     router.push({
-      pathname: "/(post_flow)/step3",
+      pathname: '/(post_flow)/step3',
       params: { 
-        type, 
-        title: title.trim(), 
-        creator: creator.trim(), 
-        year, 
-        genre 
-      },
+        // Media information
+        mediaId: selectedMedia.id,
+        title: selectedMedia.title,
+        type: selectedMedia.type,
+        year: selectedMedia.year || '',
+        creator: selectedMedia.author || selectedMedia.director || '',
+        genre: '', // Can be extended later
+        image: selectedMedia.image || '',
+        description: selectedMedia.description || '',
+      }
     });
   };
 
-  const handleImageUpload = () => {
-    // TODO: Implement image picker functionality
-    Alert.alert(
-      'Image Upload',
-      'Image upload functionality will be implemented in a future update.',
-      [{ text: 'OK' }]
+  const handleGoBack = () => {
+    if (showConfirmation) {
+      setShowConfirmation(false);
+      setSelectedMedia(null);
+    } else {
+      router.back();
+    }
+  };
+
+  const renderSelectedMedia = () => {
+    if (!selectedMedia || !showConfirmation) return null;
+
+    return (
+      <View style={styles.selectedContainer}>
+        <Text style={styles.selectedTitle}>Selected {getMediaTypeLabel(mediaType)}</Text>
+        
+        <View style={styles.selectedCard}>
+          <Text style={styles.selectedEmoji}>{getMediaTypeEmoji(selectedMedia.type)}</Text>
+          <View style={styles.selectedInfo}>
+            <Text style={styles.selectedMediaTitle}>{selectedMedia.title}</Text>
+            {selectedMedia.author && (
+              <Text style={styles.selectedAuthor}>by {selectedMedia.author}</Text>
+            )}
+            {selectedMedia.year && (
+              <Text style={styles.selectedYear}>{selectedMedia.year}</Text>
+            )}
+            {selectedMedia.description && (
+              <Text style={styles.selectedDescription} numberOfLines={3}>
+                {selectedMedia.description}
+              </Text>
+            )}
+          </View>
+        </View>
+
+        <View style={styles.confirmButtons}>
+          <TouchableOpacity 
+            style={styles.changeButton} 
+            onPress={() => setShowConfirmation(false)}
+          >
+            <Text style={styles.changeButtonText}>Change Selection</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.continueButton} 
+            onPress={handleContinue}
+          >
+            <Text style={styles.continueButtonText}>Continue</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
     );
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardDismissWrapper>
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => router.back()}
-          >
+        <View style={styles.content}>
+          {/* Header */}
+          <View style={styles.header}>
+            <TouchableOpacity style={styles.backButton} onPress={handleGoBack}>
             <Ionicons name="chevron-back" size={24} color="#000" />
             <Text style={styles.backText}>Back</Text>
           </TouchableOpacity>
 
           <Text style={styles.headerTitle}>write a new revue</Text>
           <Text style={styles.stepTitle}>STEP 2</Text>
-          <Text style={styles.stepSubtitle}>
-            Tell us about the {type} you're revuing
+            <Text style={styles.subtitle}>
+              search for the {getMediaTypeLabel(mediaType).toLowerCase()} you want to revue
+            </Text>
+          </View>
+
+          {/* Search or Confirmation */}
+          <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}>
+            {showConfirmation ? (
+              renderSelectedMedia()
+            ) : (
+              <View style={styles.searchSection}>
+                <Text style={styles.searchTitle}>
+                  {getMediaTypeEmoji(mediaType)} Find your {getMediaTypeLabel(mediaType).toLowerCase()}
+                </Text>
+                <Text style={styles.searchSubtitle}>
+                  Search by title{mediaType === 'book' ? ', author' : ', director'}, or browse trending {getMediaTypeLabel(mediaType).toLowerCase()}s
           </Text>
 
-          <Text style={styles.label}>title of {type}: *</Text>
-          <TextInput
-            style={styles.input}
-            placeholder={`Enter ${type} title`}
-            value={title}
-            onChangeText={setTitle}
-            placeholderTextColor="#666"
-            autoCapitalize="words"
-          />
-
-          <Text style={styles.label}>{fields.creatorLabel} *</Text>
-          <TextInput
-            style={styles.input}
-            placeholder={`Enter ${fields.creatorLabel.replace(':', '')}`}
-            value={creator}
-            onChangeText={setCreator}
-            placeholderTextColor="#666"
-            autoCapitalize="words"
-          />
-
-          <Text style={styles.label}>optional:</Text>
-          <TouchableOpacity style={styles.placeholderImage} onPress={handleImageUpload}>
-            <Ionicons name="image-outline" size={32} color="#2F4F4F" />
-            <Text style={styles.placeholderText}>{fields.uploadLabel}</Text>
-            <Text style={styles.placeholderSubtext}>Tap to select from library</Text>
-          </TouchableOpacity>
-
-          <Dropdown
-            label="year created:"
-            value={year}
-            options={years}
-            onSelect={setYear}
-          />
-
-          <Dropdown
-            label="genre:"
-            value={genre}
-            options={fields.genreOptions}
-            onSelect={setGenre}
-          />
-
-          <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
-            <Text style={styles.nextButtonText}>Next</Text>
-          </TouchableOpacity>
+                <MediaSearchInput
+                  mediaType={mediaType}
+                  placeholder={`Search ${getMediaTypeLabel(mediaType).toLowerCase()}s...`}
+                  onMediaSelect={handleMediaSelect}
+                  showPopular={true}
+                  maxResults={15}
+                  style={styles.searchInput}
+                />
+              </View>
+            )}
         </ScrollView>
+        </View>
       </KeyboardDismissWrapper>
     </SafeAreaView>
   );
@@ -273,154 +173,158 @@ export default function Step2() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FAF9F6",
+    backgroundColor: '#FFFDF6',
   },
-  scrollView: {
+  content: {
     flex: 1,
-  },
-  scrollContent: {
     paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 40,
+  },
+  header: {
+    marginBottom: 20,
   },
   backButton: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 20,
+    marginTop: 10,
   },
   backText: {
     fontSize: 16,
     marginLeft: 5,
+    color: '#000',
     fontFamily: 'LibreBaskerville_400Regular',
   },
   headerTitle: {
-    fontSize: 24,
-    fontStyle: "italic",
-    fontFamily: 'LibreBaskerville_400Regular_Italic',
-    textAlign: "center",
-    marginBottom: 20,
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#142D0A',
+    marginBottom: 8,
+    fontFamily: 'LibreBaskerville_700Bold',
   },
   stepTitle: {
-    fontSize: 24,
-    fontFamily: 'LibreBaskerville_700Bold',
-    color: "#2F4F4F",
-    textAlign: "center",
-    marginBottom: 10,
-  },
-  stepSubtitle: {
-    fontSize: 16,
-    color: "#666",
-    textAlign: "center",
-    marginBottom: 40,
-    fontFamily: 'LibreBaskerville_400Regular',
-  },
-  label: {
-    fontSize: 18,
-    color: "#2F4F4F",
-    marginBottom: 10,
-    fontFamily: 'LibreBaskerville_400Regular',
-  },
-  input: {
-    backgroundColor: "#F2EFE6",
-    padding: 15,
-    borderRadius: 8,
-    fontSize: 16,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: "#E8E4D8",
-    fontFamily: 'LibreBaskerville_400Regular',
-  },
-  placeholderImage: {
-    backgroundColor: "#F2EFE6",
-    padding: 20,
-    borderRadius: 8,
-    alignItems: "center",
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: "#E8E4D8",
-    borderStyle: "dashed",
-  },
-  placeholderText: {
-    fontSize: 16,
-    color: "#2F4F4F",
-    marginTop: 10,
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#8B9A7D',
+    marginBottom: 8,
+    letterSpacing: 2,
     fontFamily: 'LibreBaskerville_700Bold',
   },
-  placeholderSubtext: {
-    fontSize: 12,
-    color: "#666",
-    marginTop: 4,
+  subtitle: {
+    fontSize: 16,
+    color: '#2F4F4F',
+    lineHeight: 24,
     fontFamily: 'LibreBaskerville_400Regular',
   },
-  pickerButton: {
-    backgroundColor: "#F2EFE6",
-    padding: 15,
-    borderRadius: 8,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: "#E8E4D8",
-  },
-  pickerText: {
-    fontSize: 16,
-    color: "#2F4F4F",
-    fontFamily: 'LibreBaskerville_400Regular',
-  },
-  nextButton: {
-    backgroundColor: "#2F4F4F",
-    padding: 15,
-    borderRadius: 8,
-    alignItems: "center",
-    marginTop: 20,
-  },
-  nextButtonText: {
-    color: "white",
-    fontSize: 16,
-    fontFamily: 'LibreBaskerville_700Bold',
-  },
-  modalOverlay: {
+  scrollContent: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "flex-end",
   },
-  modalContent: {
-    backgroundColor: "#FAF9F6",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: "70%",
+  searchSection: {
+    flex: 1,
   },
-  modalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E5E5E5",
-  },
-  modalTitle: {
-    fontSize: 18,
+  searchTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#142D0A',
+    marginBottom: 8,
     fontFamily: 'LibreBaskerville_700Bold',
-    color: "#2F4F4F",
   },
-  closeButton: {
-    padding: 5,
-  },
-  optionItem: {
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E5E5E5",
-  },
-  selectedOption: {
-    backgroundColor: "#F2EFE6",
-  },
-  optionText: {
-    fontSize: 16,
-    color: "#2F4F4F",
+  searchSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 24,
+    lineHeight: 20,
     fontFamily: 'LibreBaskerville_400Regular',
   },
-  selectedOptionText: {
+  searchInput: {
+    flex: 1,
+    minHeight: 400, // Ensure enough space for results
+  },
+  selectedContainer: {
+    flex: 1,
+    paddingVertical: 20,
+  },
+  selectedTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#142D0A',
+    marginBottom: 20,
+    textAlign: 'center',
+    fontFamily: 'LibreBaskerville_700Bold',
+  },
+  selectedCard: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 30,
+    borderWidth: 2,
+    borderColor: '#142D0A',
+    alignItems: 'center',
+  },
+  selectedEmoji: {
+    fontSize: 48,
+    marginBottom: 16,
+  },
+  selectedInfo: {
+    alignItems: 'center',
+  },
+  selectedMediaTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#142D0A',
+    textAlign: 'center',
+    marginBottom: 8,
+    fontFamily: 'LibreBaskerville_700Bold',
+  },
+  selectedAuthor: {
+    fontSize: 16,
+    color: '#666',
+    fontStyle: 'italic',
+    marginBottom: 4,
+    fontFamily: 'LibreBaskerville_400Regular_Italic',
+  },
+  selectedYear: {
+    fontSize: 14,
+    color: '#8B9A7D',
+    marginBottom: 12,
+    fontFamily: 'LibreBaskerville_400Regular',
+  },
+  selectedDescription: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 20,
+    fontFamily: 'LibreBaskerville_400Regular',
+  },
+  confirmButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  changeButton: {
+    flex: 1,
+    backgroundColor: 'transparent',
+    borderWidth: 2,
+    borderColor: '#142D0A',
+    borderRadius: 25,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  changeButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#142D0A',
+    fontFamily: 'LibreBaskerville_700Bold',
+  },
+  continueButton: {
+    flex: 1,
+    backgroundColor: '#142D0A',
+    borderRadius: 25,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  continueButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: 'white',
     fontFamily: 'LibreBaskerville_700Bold',
   },
 });

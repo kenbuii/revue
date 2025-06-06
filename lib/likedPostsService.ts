@@ -75,11 +75,11 @@ class LikedPostsService {
 
   /**
    * Fetch user's liked posts/revues
-   * Updated to use the new likesService functionality
+   * HYBRID APPROACH: Use RPC function for optimal performance
    */
   async getUserLikedPosts(userId?: string): Promise<LikedPost[]> {
     try {
-      console.log('🔍 Fetching user liked posts...');
+      console.log('🔍 Fetching user liked posts using RPC...');
 
       const session = await supabaseAuth.getSession();
       const targetUserId = userId || session.data.session?.user?.id;
@@ -89,9 +89,9 @@ class LikedPostsService {
         return [];
       }
 
-      // Get posts with user likes using direct SQL query
+      // Use the new RPC function for liked posts
       const likedPosts = await this.makeSupabaseRequest(
-        `post_likes?select=*,posts!inner(id,title,content,media_id,user_id,created_at,user_profiles!inner(display_name,avatar_url),media_items!inner(title,media_type,image_url))&user_id=eq.${targetUserId}&order=created_at.desc`
+        `rpc/get_user_liked_posts?p_user_id=${targetUserId}&p_limit=20&p_offset=0`
       );
 
       if (!likedPosts || !Array.isArray(likedPosts)) {
@@ -101,27 +101,78 @@ class LikedPostsService {
 
       console.log(`✅ Found ${likedPosts.length} liked posts`);
       
-      return likedPosts.map((like: any) => ({
-        id: like.posts.id,
-        title: like.posts.media_items.title,
-        cover: like.posts.media_items.image_url || 'https://via.placeholder.com/120x160',
-        comment: like.posts.content,
+      // Transform using the new RPC result structure
+      return likedPosts.map((post: any) => ({
+        id: post.post_id,
+        title: post.media_title || 'Unknown Media',
+        cover: post.media_cover_url || 'https://via.placeholder.com/120x160',
+        comment: post.content,
         media: {
-          id: like.posts.media_id,
-          title: like.posts.media_items.title,
-          type: like.posts.media_items.media_type,
-          cover: like.posts.media_items.image_url || 'https://via.placeholder.com/120x160',
+          id: post.media_item_id || '',
+          title: post.media_title || 'Unknown Media',
+          type: post.media_type || 'unknown',
+          cover: post.media_cover_url || 'https://via.placeholder.com/120x160',
         },
         user: {
-          name: like.posts.user_profiles.display_name,
-          avatar: like.posts.user_profiles.avatar_url || 'https://via.placeholder.com/40',
+          name: post.author_display_name || post.author_username || 'Unknown User',
+          avatar: post.author_avatar_url || 'https://via.placeholder.com/40',
+        },
+        likedAt: post.liked_at,
+      }));
+
+    } catch (error) {
+      console.error('❌ Error fetching liked posts with RPC, trying fallback:', error);
+      // Fallback to PostgREST approach if RPC fails
+      return this.getUserLikedPostsFallback(userId);
+    }
+  }
+
+  /**
+   * Fallback method using PostgREST (now that FK constraint is fixed)
+   */
+  private async getUserLikedPostsFallback(userId?: string): Promise<LikedPost[]> {
+    try {
+      console.log('⚠️ Using PostgREST fallback for liked posts...');
+
+      const session = await supabaseAuth.getSession();
+      const targetUserId = userId || session.data.session?.user?.id;
+
+      if (!targetUserId) {
+        return [];
+      }
+
+      // Use PostgREST with proper relationships (now that FK constraint exists)
+      const likedPosts = await this.makeSupabaseRequest(
+        `post_likes?select=*,posts!inner(id,title,content,media_item_id,user_id,created_at,user_profiles(*),media_items(*))&user_id=eq.${targetUserId}&order=created_at.desc`
+      );
+
+      if (!likedPosts || !Array.isArray(likedPosts)) {
+        console.log('⚠️ No liked posts found in fallback');
+        return [];
+      }
+
+      console.log(`✅ Found ${likedPosts.length} liked posts using fallback`);
+      
+      return likedPosts.map((like: any) => ({
+        id: like.posts.id,
+        title: like.posts.media_items?.title || 'Unknown Media',
+        cover: like.posts.media_items?.cover_image_url || 'https://via.placeholder.com/120x160',
+        comment: like.posts.content,
+        media: {
+          id: like.posts.media_item_id || '',
+          title: like.posts.media_items?.title || 'Unknown Media',
+          type: like.posts.media_items?.media_type || 'unknown',
+          cover: like.posts.media_items?.cover_image_url || 'https://via.placeholder.com/120x160',
+        },
+        user: {
+          name: like.posts.user_profiles?.display_name || like.posts.user_profiles?.username || 'Unknown User',
+          avatar: like.posts.user_profiles?.avatar_url || 'https://via.placeholder.com/40',
         },
         likedAt: like.created_at,
       }));
 
     } catch (error) {
-      console.error('❌ Error fetching liked posts:', error);
-      // Fallback to empty array for now
+      console.error('❌ Error with PostgREST fallback for liked posts:', error);
       console.log('⚠️ Returning empty array due to error');
       return [];
     }

@@ -77,8 +77,30 @@ export default function PostCard({ post }: { post: Post }) {
   const [localLikeCount, setLocalLikeCount] = useState(post.likeCount);
 
   const handleMediaPress = () => {
-    console.log('Media pressed, navigating to media detail page');
-    router.push(`/media/${post.media.id}`);
+    // Enhanced navigation - pass all available media data like Search does
+    console.log('📱 Media pressed from PostCard, navigating to media detail page for:', post.media.title);
+    console.log('🎯 Passing media data:', {
+      id: post.media.id,
+      title: post.media.title,
+      type: post.media.type,
+      image: post.media.cover
+    });
+    
+    router.push({
+      pathname: '/media/[id]' as const,
+      params: {
+        id: post.media.id,
+        title: post.media.title,
+        type: post.media.type,
+        year: '', // Not available in post data, but media detail can handle empty
+        image: post.media.cover || '', // 🎯 Pass the cover image!
+        description: '', // Not available in post data
+        rating: '', // Not available in post data  
+        author: '', // Not available in post data
+        // Flag to indicate this came from feed
+        source: 'feed'
+      },
+    });
   };
 
   const handlePostPress = () => {
