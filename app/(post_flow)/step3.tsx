@@ -223,39 +223,20 @@ export default function Step3() {
 
       console.log('📝 Creating post with:', createPostParams);
 
-      const result = await postService.createPostFixed(createPostParams);
+      const result = await postService.createPost(createPostParams);
 
       if (result.success) {
-        // Set global flag to refresh feed when user returns to home
-        global.shouldRefreshFeed = true;
+        // Clear any saved draft
+        await postService.clearDraftPosts();
         
-        Alert.alert(
-          'Success!',
-          'Your revue has been published successfully.',
-          [
-            {
-              text: 'View in Feed',
-              onPress: () => {
-                router.push('/(tabs)');
-              },
-            },
-            {
-              text: 'Back to Media',
-              onPress: safeNavigateBack,
-            },
-          ],
-          { cancelable: false }
-        );
+        // Navigate to success screen
+        router.push('/(tabs)' as const);
       } else {
-        throw new Error(result.error || 'Failed to create post');
+        Alert.alert('Error', result.error || 'Failed to create post');
       }
     } catch (error) {
       console.error('❌ Error creating post:', error);
-      Alert.alert(
-        'Error',
-        'Failed to publish your revue. Please try again.',
-        [{ text: 'OK' }]
-      );
+      Alert.alert('Error', 'Failed to create post. Please try again.');
     } finally {
       setIsSubmitting(false);
     }

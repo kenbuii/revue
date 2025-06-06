@@ -54,6 +54,7 @@
     "expo-system-ui": "~5.0.8",
     "expo-updates": "~0.28.14",
     "expo-web-browser": "~14.1.6",
+    "node-fetch": "^3.3.2",
     "pg": "^8.16.0",
     "react": "19.0.0",
     "react-dom": "19.0.0",

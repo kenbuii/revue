@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { StyleSheet, View, Text, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert } from 'react-native';
 import { useLocalSearchParams, Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -209,14 +209,18 @@ function CommentItem({ comment, postId, isReply = false }: CommentItemProps) {
 
 export default function PostDetailScreen() {
   const router = useRouter();
-  const { id } = useLocalSearchParams();
-  const postId = Array.isArray(id) ? id[0] : id || '';
+  const params = useLocalSearchParams();
+  const id = params.id;
+  const postId = React.useMemo(() => Array.isArray(id) ? id[0] : id || '', [id]);
+
+  // Get comments context hooks
+  const { loadComments, comments, loading: commentsLoading } = usePostComments(postId);
 
   // Validate UUID format to prevent invalid post ID issues
-  const isValidUUID = (uuid: string) => {
+  const isValidUUID = useCallback((uuid: string) => {
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     return uuidRegex.test(uuid);
-  };
+  }, []);
 
   // State
   const [post, setPost] = useState<Post | null>(null);
@@ -224,43 +228,62 @@ export default function PostDetailScreen() {
   const [postError, setPostError] = useState<string | null>(null);
   const [newComment, setNewComment] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
-  const [performingAction, setPerformingAction] = useState(false); // For like/favorite/bookmark actions
+  const [performingAction, setPerformingAction] = useState(false);
 
-  // Early validation - prevent loading if invalid post ID
+  // Load post data and comments
   useEffect(() => {
-    if (!postId) {
-      setPostError('No post ID provided');
-      setLoadingPost(false);
-      return;
-    }
-    
-    if (!isValidUUID(postId)) {
-      console.error('❌ Invalid post ID format:', postId);
-      setPostError(`Invalid post ID format: "${postId}"`);
-      setLoadingPost(false);
-      return;
-    }
-    
-    // Additional check for obviously invalid IDs
-    if (postId === 'undefined' || postId === 'null' || postId.length < 10) {
-      console.error('❌ Suspicious post ID detected:', postId);
-      setPostError(`Invalid post ID: "${postId}"`);
-      setLoadingPost(false);
-      return;
-    }
-    
-    // Clear any previous errors
-    setPostError(null);
-  }, [postId]);
+    let mounted = true;
+
+    const initializePost = async () => {
+      if (!postId) {
+        setPostError('No post ID provided');
+        setLoadingPost(false);
+        return;
+      }
+      
+      if (!isValidUUID(postId)) {
+        console.error('❌ Invalid post ID format:', postId);
+        setPostError(`Invalid post ID format: "${postId}"`);
+        setLoadingPost(false);
+        return;
+      }
+      
+      if (postId === 'undefined' || postId === 'null' || postId.length < 10) {
+        console.error('❌ Suspicious post ID detected:', postId);
+        setPostError(`Invalid post ID: "${postId}"`);
+        setLoadingPost(false);
+        return;
+      }
+
+      try {
+        // Load post data
+        await loadPostData();
+        
+        // Load comments only if post loads successfully
+        if (mounted) {
+          await loadComments(false);
+        }
+      } catch (error) {
+        console.error('Error initializing post:', error);
+        if (mounted) {
+          setPostError('Failed to load post data');
+          setLoadingPost(false);
+        }
+      }
+    };
+
+    initializePost();
+
+    return () => {
+      mounted = false;
+    };
+  }, [postId, loadComments, isValidUUID]);
 
   // Contexts - with error boundaries
   const { 
-    comments, 
-    loading: loadingComments, 
-    error: commentsError,
     commentCount,
     createComment,
-    loadComments 
+    loadComments: loadCommentsContext 
   } = usePostComments(postId && !postError ? postId : '');  // Only initialize if valid postId
   
   const { 
@@ -271,13 +294,6 @@ export default function PostDetailScreen() {
   } = usePostInteractions();
   
   const { isBookmarked, toggleBookmark } = useBookmarks();
-
-  // Load post data
-  useEffect(() => {
-    if (postId && !postError && isValidUUID(postId)) {
-      loadPostData();
-    }
-  }, [postId, postError]);
 
   const loadPostData = async () => {
     try {
@@ -515,17 +531,10 @@ export default function PostDetailScreen() {
             Comments {commentCount > 0 && `(${commentCount})`}
           </Text>
           
-          {loadingComments ? (
+          {commentsLoading ? (
             <View style={styles.commentsLoading}>
               <ActivityIndicator size="small" color="#004D00" />
               <Text style={styles.loadingText}>Loading comments...</Text>
-            </View>
-          ) : commentsError ? (
-            <View style={styles.commentsError}>
-              <Text style={styles.errorText}>{commentsError}</Text>
-              <TouchableOpacity onPress={() => loadComments(true)}>
-                <Text style={styles.retryText}>Tap to retry</Text>
-              </TouchableOpacity>
             </View>
           ) : comments.length === 0 ? (
             <View style={styles.noComments}>
@@ -651,18 +660,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 20,
-  },
-  commentsError: {
-    padding: 20,
-    alignItems: 'center',
-  },
-  errorText: {
-    color: '#FF6B6B',
-    marginBottom: 8,
-  },
-  retryText: {
-    color: '#004D00',
-    fontWeight: '600',
   },
   noComments: {
     padding: 20,

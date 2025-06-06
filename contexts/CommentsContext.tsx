@@ -108,6 +108,15 @@ export function CommentsProvider({ children }: { children: ReactNode }) {
   const loadComments = useCallback(async (postId: string, forceRefresh: boolean = false): Promise<void> => {
     console.log('💬 Loading comments for post:', postId);
 
+    // Get current state
+    const currentState = getPostCommentsState(postId);
+
+    // Prevent multiple simultaneous loads for the same post
+    if (currentState.loading) {
+      console.log('⚠️ Already loading comments for post:', postId);
+      return;
+    }
+
     // Check cache first (unless force refresh)
     if (!forceRefresh && isCacheFresh(postId)) {
       console.log('📋 Using cached comments for post:', postId);
@@ -120,6 +129,13 @@ export function CommentsProvider({ children }: { children: ReactNode }) {
     try {
       const comments = await commentsService.getPostComments(postId);
       
+      // Verify we're still mounted and this request is still relevant
+      const latestState = getPostCommentsState(postId);
+      if (latestState.lastFetched > currentState.lastFetched) {
+        console.log('⚠️ Newer comments data exists, skipping update');
+        return;
+      }
+
       updateCommentState(postId, {
         comments,
         loading: false,
@@ -137,7 +153,7 @@ export function CommentsProvider({ children }: { children: ReactNode }) {
         lastFetched: 0,
       });
     }
-  }, [commentsCache]); // Depend on commentsCache to ensure proper memoization
+  }, []); // Remove commentsCache dependency since we use getPostCommentsState
 
   /**
    * Create a new comment (memoized)

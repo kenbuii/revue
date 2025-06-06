@@ -1,4 +1,4 @@
-import { supabaseAuth, supabase } from './supabase';
+import { supabaseAuth } from './supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Types for post data - Updated to match actual database schema
@@ -124,44 +124,27 @@ class PostService {
   // Create or update media item in database
   private async ensureMediaItem(params: CreatePostParams): Promise<string> {
     try {
-      // Generate a media ID if not provided
-      const mediaId = params.mediaId || `${params.mediaType}_${params.mediaTitle.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()}_${Date.now()}`;
+      // Use the new upsert function instead of direct insertion
+      const mediaId = params.mediaId || `${params.mediaType}_${Date.now()}`;
       
-      // Create media item with correct column names and required fields
-      const { data: mediaItem, error: mediaError } = await supabase
-        .from('media_items')
-        .insert({
-          id: mediaId,
-          title: params.mediaTitle,
-          media_type: params.mediaType,
-          year: params.mediaYear || null,
-          cover_image_url: params.mediaCover || null,
-          description: '',
-          author: params.mediaCreator || null,
-          isbn: '',
-          average_rating: 0,
-          total_ratings: 0,
-          popularity_score: 0,
-          external_id: '',
-          metadata: {
-            genre: params.mediaGenre || null,
-            source: 'popular'
-          },
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .select()
-        .single();
+      const result = await this.callRPC('upsert_media_item', {
+        p_media_id: mediaId,
+        p_title: params.mediaTitle,
+        p_media_type: params.mediaType,
+        p_year: params.mediaYear,
+        p_image_url: params.mediaCover,
+        p_description: '', // Could be extended later
+        p_creator: params.mediaCreator,
+        p_genre: params.mediaGenre,
+        p_source: 'popular',
+        p_original_api_id: null,
+      });
 
-      if (mediaError) {
-        console.warn('❌ Failed to create media item:', mediaError);
-        return mediaId;
-      }
-
-      console.log('✅ Media item created successfully:', mediaItem);
-      return mediaItem.id;
+      console.log('✅ Media item upserted successfully:', result);
+      return result; // The function returns the media_id
     } catch (error) {
-      console.warn('❌ Failed to create media item:', error);
+      console.warn('❌ Failed to upsert media item, using generated ID:', error);
+      // If upsert fails, return a generated ID
       return params.mediaId || `${params.mediaType}_${Date.now()}`;
     }
   }
@@ -178,61 +161,49 @@ class PostService {
 
       console.log('📝 Creating post with params:', params);
 
-      // Ensure media item exists in database
+      // Ensure media item exists in database (or use undefined if it fails)
       let mediaId: string | undefined = undefined;
-      if (params.mediaTitle && params.mediaType) {
-        try {
-          mediaId = await this.ensureMediaItem(params);
-          console.log('✅ Media item ensured with ID:', mediaId);
-        } catch (error) {
-          console.warn('⚠️ Media item creation failed:', error);
-          return { success: false, error: 'Failed to create media item' };
-        }
+      try {
+        mediaId = await this.ensureMediaItem(params);
+      } catch (error) {
+        console.warn('⚠️ Media item creation failed, posting without media reference:', error);
+        // Continue with undefined media_item_id - this is allowed by the schema
       }
 
-      // Create the post with direct table insertion for better error handling
-      const { data: post, error: postError } = await supabase
-        .from('posts')
-        .insert({
-          user_id: userId,
-          content: params.content,
-          media_item_id: mediaId || null,
-          rating: params.rating ? Math.round(params.rating) : null,
-          contains_spoilers: false,
-          visibility: 'public',
-          like_count: 0,
-          comment_count: 0,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .select()
-        .single();
+      // Use the working create_post RPC function instead of direct insertion
+      const result = await this.callRPC('create_post', {
+        p_user_id: userId,
+        p_content: params.content,
+        p_media_item_id: mediaId || null, // Convert undefined to null for database
+        p_rating: params.rating ? Math.round(params.rating) : null,
+        p_contains_spoilers: false, // Could be extended later
+        p_visibility: 'public'
+      });
 
-      if (postError) {
-        console.error('❌ Post creation failed:', postError);
+      if (result.success) {
+        console.log('✅ Post created successfully:', result.post_id);
+        
+        // Return the created post data
+        return { 
+          success: true, 
+          post: {
+            id: result.post_id,
+            user_id: userId,
+            content: params.content,
+            media_item_id: mediaId,
+            rating: params.rating ? Math.round(params.rating) : undefined,
+            contains_spoilers: false,
+            visibility: 'public',
+            created_at: new Date().toISOString()
+          }
+        };
+      } else {
+        console.error('❌ RPC create_post failed:', result.error);
         return { 
           success: false, 
-          error: postError.message || 'Failed to create post'
+          error: result.error || 'Failed to create post'
         };
       }
-
-      console.log('✅ Post created successfully:', post);
-      return { 
-        success: true, 
-        post: {
-          id: post.id,
-          user_id: userId,
-          content: params.content,
-          media_item_id: mediaId,
-          rating: params.rating ? Math.round(params.rating) : undefined,
-          contains_spoilers: false,
-          visibility: 'public',
-          created_at: post.created_at,
-          updated_at: post.updated_at,
-          like_count: 0,
-          comment_count: 0
-        }
-      };
     } catch (error) {
       console.error('❌ Error creating post:', error);
       return { 
@@ -254,17 +225,17 @@ class PostService {
 
       console.log('🔧 FIXED: Creating post with params:', params);
 
-      // FIXED: Use only the working upsert_media_item function
+      // FIXED: Properly create media item instead of skipping it
       let mediaId: string | undefined = undefined;
       
       if (params.mediaTitle && params.mediaType) {
         try {
-          console.log('🎬 Creating media item using working upsert function...');
+          console.log('🎬 Creating media item for post...');
           
           // Create a proper media ID based on the media info
           const generatedMediaId = params.mediaId || `${params.mediaType}_${params.mediaTitle.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()}_${Date.now()}`;
           
-          // Use ONLY the working upsert_media_item function
+          // Try to create/upsert the media item
           const mediaResult = await this.callRPC('upsert_media_item', {
             p_media_id: generatedMediaId,
             p_title: params.mediaTitle,
@@ -278,16 +249,41 @@ class PostService {
             p_original_api_id: null,
           });
           
-          mediaId = mediaResult; // This should be the media ID
-          console.log('✅ Media item created via upsert:', mediaId);
+          mediaId = mediaResult || generatedMediaId;
+          console.log('✅ Media item created/found:', mediaId);
           
         } catch (error) {
-          console.warn('⚠️ Media item creation failed, proceeding without media:', error);
-          // Continue without media - this is allowed
+          console.warn('⚠️ Media item creation failed, using direct insertion fallback:', error);
+          
+          // Fallback: try direct insertion into media_items table
+          try {
+            const generatedMediaId = `${params.mediaType}_${Date.now()}`;
+            
+            const mediaItems = await this.makeDirectRequest('media_items', 'POST', {
+              id: generatedMediaId,
+              title: params.mediaTitle,
+              media_type: params.mediaType,
+              year: params.mediaYear || null,
+              image_url: params.mediaCover || null,
+              description: null,
+              creator: params.mediaCreator || null,
+              genre: params.mediaGenre || null,
+              source: 'popular',
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            });
+            
+            if (mediaItems && mediaItems.length > 0) {
+              mediaId = mediaItems[0].id;
+              console.log('✅ Media item created via direct insertion:', mediaId);
+            }
+          } catch (fallbackError) {
+            console.warn('⚠️ Direct insertion also failed, proceeding without media:', fallbackError);
+          }
         }
       }
 
-      // Create the post with the media_item_id
+      // Create the post with proper media_item_id
       console.log('🔧 FIXED: Calling create_post RPC function with media_item_id:', mediaId);
       
       const result = await this.callRPC('create_post', {
