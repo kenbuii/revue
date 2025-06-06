@@ -29,7 +29,7 @@
     "@react-navigation/native": "^7.0.14",
     "@supabase/auth-js": "^2.70.0",
     "@supabase/auth-ui-shared": "^0.1.8",
-    "@supabase/supabase-js": "^2.49.9",
+    "@supabase/supabase-js": "^2.49.10",
     "@types/crypto-js": "^4.2.2",
     "buffer": "^6.0.3",
     "crypto-js": "^4.2.0",

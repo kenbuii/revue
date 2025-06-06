@@ -50,33 +50,102 @@ class CommentsService {
   }
 
   /**
-   * Get all comments for a post
+   * Make direct REST API request to Supabase
+   */
+  private async makeDirectRequest(endpoint: string, method: string = 'GET', body?: any) {
+    const session = await supabaseAuth.getSession();
+    const token = session.data.session?.access_token || this.supabaseAnonKey;
+
+    const response = await fetch(`${this.supabaseUrl}/rest/v1/${endpoint}`, {
+      method,
+      headers: {
+        'apikey': this.supabaseAnonKey!,
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation'
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Request failed: ${response.status} - ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Get all comments for a post - FIXED VERSION
    */
   async getPostComments(postId: string): Promise<Comment[]> {
     try {
       console.log('💬 Fetching comments for post:', postId);
       
-      const result = await this.callRPC('get_post_comments', { p_post_id: postId });
+      // WORKAROUND: Use separate queries since no foreign key relationship exists
+      console.log('🔧 Using separate queries workaround for comments');
       
-      if (!result || !Array.isArray(result)) {
-        console.log('⚠️ No comments found or invalid response');
+      // First, get all comments for this post
+      const comments = await this.makeDirectRequest(
+        `post_comments?post_id=eq.${postId}&order=created_at.asc`
+      );
+      
+      if (!comments || !Array.isArray(comments) || comments.length === 0) {
+        console.log('⚠️ No comments found');
         return [];
       }
 
-      console.log(`✅ Found ${result.length} comments`);
-      return result.map((comment: any) => ({
-        id: comment.id,
-        content: comment.content,
-        user_id: comment.user_id,
-        username: comment.username,
-        display_name: comment.display_name,
-        avatar_url: comment.avatar_url || 'https://via.placeholder.com/40',
-        parent_comment_id: comment.parent_comment_id,
-        like_count: comment.like_count || 0,
-        is_liked_by_user: comment.is_liked_by_user || false,
-        created_at: comment.created_at,
-        updated_at: comment.updated_at,
-      }));
+      console.log(`📝 Found ${comments.length} raw comments, fetching user info...`);
+
+      // Get unique user IDs
+      const userIds = [...new Set(comments.map((comment: any) => comment.user_id))];
+      
+      // Fetch user profiles for all user IDs
+      const userProfiles: { [key: string]: any } = {};
+      
+      for (const userId of userIds) {
+        try {
+          const profiles = await this.makeDirectRequest(
+            `user_profiles?user_id=eq.${userId}&select=user_id,username,display_name,avatar_url`
+          );
+          
+          if (profiles && profiles.length > 0) {
+            userProfiles[userId] = profiles[0];
+          }
+        } catch (error) {
+          console.warn(`⚠️ Failed to fetch profile for user ${userId}:`, error);
+          userProfiles[userId] = {
+            username: 'Unknown',
+            display_name: 'Unknown User',
+            avatar_url: 'https://via.placeholder.com/40'
+          };
+        }
+      }
+
+      console.log(`✅ Found ${comments.length} comments with user info`);
+      
+      // Combine comments with user profiles
+      return comments.map((comment: any) => {
+        const userProfile = userProfiles[comment.user_id] || {
+          username: 'Unknown',
+          display_name: 'Unknown User',
+          avatar_url: 'https://via.placeholder.com/40'
+        };
+        
+        return {
+          id: comment.id,
+          content: comment.content,
+          user_id: comment.user_id,
+          username: userProfile.username || 'Unknown',
+          display_name: userProfile.display_name || 'Unknown User',
+          avatar_url: userProfile.avatar_url || 'https://via.placeholder.com/40',
+          parent_comment_id: comment.parent_comment_id,
+          like_count: 0, // Post comments table doesn't have like_count
+          is_liked_by_user: false, // Would need separate query to check this
+          created_at: comment.created_at,
+          updated_at: comment.updated_at,
+        };
+      });
     } catch (error) {
       console.error('❌ Error fetching comments:', error);
       return [];
@@ -84,7 +153,7 @@ class CommentsService {
   }
 
   /**
-   * Create a new comment
+   * Create a new comment - FIXED VERSION
    */
   async createComment(params: CreateCommentParams): Promise<{ success: boolean; comment?: Comment; error?: string }> {
     try {
@@ -94,33 +163,89 @@ class CommentsService {
         return { success: false, error: 'Comment content cannot be empty' };
       }
 
-      const result = await this.callRPC('create_comment', {
-        p_post_id: params.post_id,
-        p_content: params.content.trim(),
-        p_parent_comment_id: params.parent_comment_id || null,
+      // WORKAROUND: Use direct insertion instead of broken RPC function
+      console.log('🔧 Using direct insertion workaround for comments');
+      
+      const session = await supabaseAuth.getSession();
+      const userId = session.data.session?.user?.id;
+
+      if (!userId) {
+        return { success: false, error: 'User not authenticated' };
+      }
+
+      // Insert directly into post_comments table
+      const newComments = await this.makeDirectRequest('post_comments', 'POST', {
+        post_id: params.post_id,
+        user_id: userId,
+        content: params.content.trim(),
+        parent_comment_id: params.parent_comment_id || null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       });
 
-      if (result.success && result.comment) {
-        console.log('✅ Comment created successfully:', result.comment.id);
-        return {
-          success: true,
-          comment: {
-            id: result.comment.id,
-            content: result.comment.content,
-            user_id: result.comment.user_id,
-            username: result.comment.username,
-            display_name: result.comment.display_name,
-            avatar_url: result.comment.avatar_url || 'https://via.placeholder.com/40',
-            parent_comment_id: result.comment.parent_comment_id,
-            like_count: result.comment.like_count || 0,
-            is_liked_by_user: result.comment.is_liked_by_user || false,
-            created_at: result.comment.created_at,
-            updated_at: result.comment.updated_at,
+      if (newComments && newComments.length > 0) {
+        const newComment = newComments[0];
+        
+        // Update post comment count
+        try {
+          // Get current count first, then increment
+          const currentPost = await this.makeDirectRequest(`posts?id=eq.${params.post_id}&select=comment_count`);
+          if (currentPost && currentPost.length > 0) {
+            const newCount = (currentPost[0].comment_count || 0) + 1;
+            await this.makeDirectRequest(`posts?id=eq.${params.post_id}`, 'PATCH', {
+              comment_count: newCount
+            });
           }
-        };
+        } catch (error) {
+          console.warn('⚠️ Failed to update comment count:', error);
+        }
+
+        // Get user profile info for the response
+        try {
+          const userProfiles = await this.makeDirectRequest(
+            `user_profiles?user_id=eq.${userId}&select=username,display_name,avatar_url`
+          );
+          
+          const userProfile = userProfiles[0] || {};
+          
+          console.log('✅ Comment created successfully via direct insertion:', newComment.id);
+          return {
+            success: true,
+            comment: {
+              id: newComment.id,
+              content: newComment.content,
+              user_id: newComment.user_id,
+              username: userProfile.username || 'Unknown',
+              display_name: userProfile.display_name || 'Unknown User',
+              avatar_url: userProfile.avatar_url || 'https://via.placeholder.com/40',
+              parent_comment_id: newComment.parent_comment_id,
+              like_count: 0, // New comments start with 0 likes
+              is_liked_by_user: false,
+              created_at: newComment.created_at,
+              updated_at: newComment.updated_at,
+            }
+          };
+        } catch (error) {
+          console.warn('⚠️ Comment created but failed to get user info:', error);
+          return {
+            success: true,
+            comment: {
+              id: newComment.id,
+              content: newComment.content,
+              user_id: newComment.user_id,
+              username: 'Unknown',
+              display_name: 'Unknown User',
+              avatar_url: 'https://via.placeholder.com/40',
+              parent_comment_id: newComment.parent_comment_id,
+              like_count: 0,
+              is_liked_by_user: false,
+              created_at: newComment.created_at,
+              updated_at: newComment.updated_at,
+            }
+          };
+        }
       } else {
-        console.error('❌ Comment creation failed:', result.error);
-        return { success: false, error: result.error || 'Unknown error' };
+        return { success: false, error: 'Failed to create comment' };
       }
     } catch (error) {
       console.error('❌ Error creating comment:', error);

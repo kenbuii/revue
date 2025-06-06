@@ -1,6 +1,7 @@
 import 'react-native-url-polyfill/auto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthClient } from '@supabase/auth-js';
+import { createClient } from '@supabase/supabase-js';
 
 // Additional polyfills for build environment
 if (typeof global.window === 'undefined') {
@@ -66,14 +67,12 @@ export const supabaseStorage = {
   }
 };
 
-// Export auth client as 'supabase' for backward compatibility
-export const supabase = { 
-  auth: supabaseAuth,
-  storage: {
-    from: (bucket: string) => ({
-      upload: (fileName: string, file: Blob, options?: { contentType?: string; upsert?: boolean }) => 
-        supabaseStorage.upload(bucket, fileName, file, options),
-      getPublicUrl: (fileName: string) => supabaseStorage.getPublicUrl(bucket, fileName)
-    })
+// Create full Supabase client for database operations
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    storage: AsyncStorage,
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: false
   }
-}; 
+}); 

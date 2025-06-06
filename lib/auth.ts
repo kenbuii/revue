@@ -470,7 +470,7 @@ class AuthService {
         sessionUserId: session.user.id
       });
 
-      const response = await fetch(`${supabaseUrl}/rest/v1/user_profiles?id=eq.${userId}`, {
+      const response = await fetch(`${supabaseUrl}/rest/v1/user_profiles?user_id=eq.${userId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',

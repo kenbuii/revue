@@ -2,7 +2,7 @@ import { supabaseAuth } from './supabase';
 
 // Types for user profile data
 export interface UserProfile {
-  id: string;
+  user_id: string;
   username: string | null;
   display_name: string | null;
   bio: string | null;
@@ -143,7 +143,7 @@ class UserProfileService {
       console.log('🔄 Fetching user profile for:', targetUserId);
 
       const profiles = await this.makeSupabaseRequest(
-        `user_profiles?id=eq.${targetUserId}&select=*`
+        `user_profiles?user_id=eq.${targetUserId}&select=*`
       );
 
       if (profiles.length === 0) {
@@ -164,16 +164,25 @@ class UserProfileService {
    */
   async getUserMediaPreferences(userId?: string): Promise<MediaPreference[]> {
     try {
+      console.log('🔄 getUserMediaPreferences called with userId:', userId);
+      
       const session = await supabaseAuth.getSession();
-      const targetUserId = userId || session.data.session?.user?.id;
+      console.log('📋 Session check result:', {
+        hasSession: !!session.data.session,
+        hasUser: !!session.data.session?.user,
+        sessionUserId: session.data.session?.user?.id,
+        providedUserId: userId
+      });
 
-      if (!targetUserId) {
-        console.log('No user ID provided and no session found');
+      if (!session.data.session?.user?.id) {
+        console.error('❌ No authenticated session found');
         return [];
       }
 
+      const targetUserId = userId || session.data.session.user.id;
+
       // SECURITY: Validate that we're only accessing current user's data
-      if (userId && session.data.session?.user?.id && userId !== session.data.session.user.id) {
+      if (userId && userId !== session.data.session.user.id) {
         console.error('🚨 SECURITY: Attempted to access different user\'s media preferences!');
         console.error('- Requested user ID:', userId);
         console.error('- Current session user ID:', session.data.session.user.id);
@@ -181,21 +190,60 @@ class UserProfileService {
       }
 
       console.log('🔄 Fetching user media preferences for:', targetUserId);
-      console.log('🔍 Session user ID:', session.data.session?.user?.id);
+      console.log('🔍 Session user ID:', session.data.session.user.id);
       console.log('🔍 Provided user ID:', userId);
       console.log('🔍 Using target user ID:', targetUserId);
+
+      // Enhanced RPC call with better error handling
+      console.log('📞 Calling RPC function with params:', { p_user_id: targetUserId });
 
       const preferences = await this.callRPC('get_user_media_preferences', {
         p_user_id: targetUserId
       });
 
+      console.log('📦 RPC response received:');
+      console.log('- Type:', typeof preferences);
+      console.log('- Is Array:', Array.isArray(preferences));
+      console.log('- Length property:', preferences?.length);
+      console.log('- Actual length:', Array.isArray(preferences) ? preferences.length : 'N/A');
+
+      // Validate the response
+      if (!preferences) {
+        console.error('❌ RPC returned null/undefined');
+        return [];
+      }
+
+      if (!Array.isArray(preferences)) {
+        console.error('❌ RPC returned non-array:', typeof preferences);
+        return [];
+      }
+
       console.log('✅ User media preferences fetched:', preferences.length, 'items');
-      console.log('🎬 Raw preferences data:', preferences);
+      console.log('🎬 Raw preferences data (first 2):', preferences.slice(0, 2));
       console.log('🎬 First preference structure:', preferences[0]);
+      
+      // Additional validation of the data structure
+      if (preferences.length > 0) {
+        const firstItem = preferences[0];
+        const hasRequiredFields = firstItem.media_id && firstItem.title && firstItem.media_type;
+        console.log('📋 Data validation:', {
+          hasRequiredFields,
+          fields: Object.keys(firstItem)
+        });
+        
+        if (!hasRequiredFields) {
+          console.error('❌ Data structure validation failed');
+          return [];
+        }
+      }
       
       return preferences as MediaPreference[];
     } catch (error) {
-      console.error('❌ Error fetching user media preferences:', error);
+      console.error('❌ Error in getUserMediaPreferences:', error);
+      console.error('❌ Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : 'No stack trace'
+      });
       return [];
     }
   }
@@ -245,7 +293,7 @@ class UserProfileService {
       console.log('🔄 Updating user profile:', updates);
 
       await this.makeSupabaseRequest(
-        `user_profiles?id=eq.${userId}`,
+        `user_profiles?user_id=eq.${userId}`,
         {
           method: 'PATCH',
           body: JSON.stringify({

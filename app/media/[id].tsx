@@ -113,11 +113,60 @@ export default function MediaDetailScreen() {
         });
       } else {
         console.error('❌ Media data not found for ID:', mediaId);
+        
+        // Check if we have navigation parameters to use as fallback
+        const hasParams = params.title && params.type;
+        if (hasParams) {
+          console.log('📋 Using navigation parameters as fallback data');
+          const fallbackData: MediaItem = {
+            id: mediaId,
+            title: Array.isArray(params.title) ? params.title[0] : params.title,
+            type: (Array.isArray(params.type) ? params.type[0] : params.type) as 'movie' | 'tv' | 'book',
+            year: params.year ? (Array.isArray(params.year) ? params.year[0] : params.year) : undefined,
+            image: params.image ? (Array.isArray(params.image) ? params.image[0] : params.image) : undefined,
+            description: params.description ? (Array.isArray(params.description) ? params.description[0] : params.description) : undefined,
+            author: params.author ? (Array.isArray(params.author) ? params.author[0] : params.author) : undefined,
+            rating: params.rating ? parseFloat(Array.isArray(params.rating) ? params.rating[0] : params.rating) : undefined,
+            source: mediaId.startsWith('nyt_') ? 'nyt_bestsellers' : 'popular',
+            originalId: mediaId.split('_').slice(1).join('_'),
+          };
+          
+          setMediaData(fallbackData);
+          console.log('✅ Fallback media data created from navigation params:', {
+            id: fallbackData.id,
+            title: fallbackData.title,
+            type: fallbackData.type,
+            hasImage: !!fallbackData.image
+          });
+        } else {
         setMediaError('Media not found');
+        }
       }
     } catch (error) {
       console.error('❌ Error loading media data:', error);
+      
+      // Check if we have navigation parameters to use as fallback
+      const hasParams = params.title && params.type;
+      if (hasParams) {
+        console.log('📋 Using navigation parameters as fallback after error');
+        const fallbackData: MediaItem = {
+          id: mediaId,
+          title: Array.isArray(params.title) ? params.title[0] : params.title,
+          type: (Array.isArray(params.type) ? params.type[0] : params.type) as 'movie' | 'tv' | 'book',
+          year: params.year ? (Array.isArray(params.year) ? params.year[0] : params.year) : undefined,
+          image: params.image ? (Array.isArray(params.image) ? params.image[0] : params.image) : undefined,
+          description: params.description ? (Array.isArray(params.description) ? params.description[0] : params.description) : undefined,
+          author: params.author ? (Array.isArray(params.author) ? params.author[0] : params.author) : undefined,
+          rating: params.rating ? parseFloat(Array.isArray(params.rating) ? params.rating[0] : params.rating) : undefined,
+          source: mediaId.startsWith('nyt_') ? 'nyt_bestsellers' : 'popular',
+          originalId: mediaId.split('_').slice(1).join('_'),
+        };
+        
+        setMediaData(fallbackData);
+        console.log('✅ Fallback media data created from navigation params after error');
+      } else {
       setMediaError(error instanceof Error ? error.message : 'Failed to load media data');
+      }
     } finally {
       setLoadingMedia(false);
     }

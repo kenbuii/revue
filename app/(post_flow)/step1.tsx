@@ -77,7 +77,7 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 20,
-    paddingTop: 100,
+    paddingTop: 60,
   },
   headerTitle: {
     fontSize: 24,
@@ -117,7 +117,7 @@ const styles = StyleSheet.create({
   },
   backButton: {
     position: 'absolute',
-    top: 60,
+    top: 20,
     left: 20,
     flexDirection: 'row',
     alignItems: 'center',

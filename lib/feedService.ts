@@ -1,5 +1,6 @@
 import { supabaseAuth } from './supabase';
 import { Post } from './posts';
+import { hiddenPostsService } from './hiddenPostsService';
 
 export interface FeedPost extends Post {
   // Additional feed-specific properties if needed
@@ -9,6 +10,30 @@ class FeedService {
   private supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
   private supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
+  // Make RPC calls to Supabase functions
+  private async callRPC(functionName: string, params: any = {}) {
+    const session = await supabaseAuth.getSession();
+    const token = session.data.session?.access_token || this.supabaseAnonKey;
+
+    const response = await fetch(`${this.supabaseUrl}/rest/v1/rpc/${functionName}`, {
+      method: 'POST',
+      headers: {
+        'apikey': this.supabaseAnonKey!,
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(params),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`RPC call failed: ${response.status} - ${error}`);
+    }
+
+    return response.json();
+  }
+
+  // Make direct REST API requests to Supabase
   private async makeDirectRequest(endpoint: string, method: string = 'GET', body?: any) {
     const session = await supabaseAuth.getSession();
     const token = session.data.session?.access_token || this.supabaseAnonKey;
@@ -19,6 +44,7 @@ class FeedService {
         'apikey': this.supabaseAnonKey!,
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
+        'Prefer': 'return=representation'
       },
       body: body ? JSON.stringify(body) : undefined,
     });
@@ -31,36 +57,36 @@ class FeedService {
     return response.json();
   }
 
-  // Get all public posts for "For You" feed
+  // Updated: Use RPC function instead of complex REST joins
   async getForYouFeed(limit: number = 20, offset: number = 0): Promise<FeedPost[]> {
     try {
-      console.log('📰 Fetching For You feed...', { limit, offset });
+      console.log('📰 Fetching enhanced For You feed...', { limit, offset });
       
-      // Fetch posts with joins to get user and media data
-      const posts = await this.makeDirectRequest(
-        `posts?select=*,user_profiles!inner(*),media_items(*)`
-        + `&is_public=eq.true`
-        + `&order=created_at.desc`
-        + `&limit=${limit}`
-        + `&offset=${offset}`
-      );
+      // Use the working RPC function instead of REST API joins
+      const posts = await this.callRPC('get_for_you_feed', {
+        p_limit: limit,
+        p_offset: offset
+      });
 
-      console.log(`✅ Found ${posts.length} posts for For You feed`);
-      // Only log data structure if we're debugging an issue
-      if (posts.length === 0 && offset === 0) {
-        console.log('📊 No posts found - checking data structure...');
-      }
+      console.log(`✅ Found ${posts?.length || 0} posts for For You feed`);
       
-      const transformedPosts = posts.map((post: any) => this.transformToFeedPost(post));
+      // Transform RPC results to FeedPost format
+      const transformedPosts = await Promise.all(
+        (posts || []).map(async (post: any) => await this.transformRpcPostToFeedPost(post))
+      );
       
-      return transformedPosts;
+      // Filter out hidden posts for current user
+      const visiblePosts = await hiddenPostsService.filterHiddenPosts(transformedPosts);
+      
+      console.log(`📰 Returning ${visiblePosts.length} posts after filtering hidden posts`);
+      return visiblePosts;
     } catch (error) {
       console.error('❌ Error fetching For You feed:', error);
       return [];
     }
   }
 
-  // Get posts from users the current user follows for "Friends + Following" feed
+  // Updated: Use RPC function for friends feed (same as For You for now)
   async getFriendsFeed(limit: number = 20, offset: number = 0): Promise<FeedPost[]> {
     try {
       const session = await supabaseAuth.getSession();
@@ -73,29 +99,33 @@ class FeedService {
 
       console.log('👥 Fetching Friends + Following feed...');
       
-      // For now, return the same as For You feed since we don't have user connections yet
-      // TODO: Update this when user following/friends functionality is implemented
-      const posts = await this.makeDirectRequest(
-        `posts?select=*,user_profiles!inner(*),media_items(*)`
-        + `&is_public=eq.true`
-        + `&order=created_at.desc`
-        + `&limit=${limit}`
-        + `&offset=${offset}`
-      );
+      // Use the same RPC function for now since we don't have user connections yet
+      const posts = await this.callRPC('get_for_you_feed', {
+        p_limit: limit,
+        p_offset: offset
+      });
 
-      console.log(`✅ Found ${posts.length} posts for Friends feed`);
-      return posts.map((post: any) => this.transformToFeedPost(post));
+      console.log(`✅ Found ${posts?.length || 0} posts for Friends feed`);
+      
+      // Transform and filter posts
+      const transformedPosts = await Promise.all(
+        (posts || []).map(async (post: any) => await this.transformRpcPostToFeedPost(post))
+      );
+      
+      const visiblePosts = await hiddenPostsService.filterHiddenPosts(transformedPosts);
+      return visiblePosts;
     } catch (error) {
       console.error('❌ Error fetching Friends feed:', error);
       return [];
     }
   }
 
-  // Get posts by a specific user (for profile page)
+  // Updated: Use RPC function for user posts
   async getUserPosts(userId?: string, limit: number = 20, offset: number = 0): Promise<FeedPost[]> {
     try {
       const session = await supabaseAuth.getSession();
       const targetUserId = userId || session.data.session?.user?.id;
+      const currentUserId = session.data.session?.user?.id;
 
       if (!targetUserId) {
         console.log('⚠️ No user ID provided for user posts');
@@ -104,25 +134,37 @@ class FeedService {
 
       console.log(`📋 Fetching posts for user: ${targetUserId}`);
       
-      const posts = await this.makeDirectRequest(
-        `posts?select=*,user_profiles!inner(*),media_items(*)`
-        + `&user_id=eq.${targetUserId}`
-        + `&is_public=eq.true`
-        + `&order=created_at.desc`
-        + `&limit=${limit}`
-        + `&offset=${offset}`
-      );
+      // Use the working RPC function
+      const posts = await this.callRPC('get_user_posts', {
+        p_user_id: targetUserId,
+        p_limit: limit,
+        p_offset: offset
+      });
 
-      console.log(`✅ Found ${posts.length} posts for user ${targetUserId}`);
-      return posts.map((post: any) => this.transformToFeedPost(post));
+      console.log(`✅ Found ${posts?.length || 0} posts for user ${targetUserId}`);
+      
+      // Transform posts with interaction data
+      const transformedPosts = await Promise.all(
+        (posts || []).map(async (post: any) => await this.transformRpcPostToFeedPost(post))
+      );
+      
+      // Only filter hidden posts if viewing own profile
+      if (targetUserId === currentUserId) {
+        return await hiddenPostsService.filterHiddenPosts(transformedPosts);
+      }
+      
+      return transformedPosts;
     } catch (error) {
       console.error(`❌ Error fetching user posts:`, error);
       return [];
     }
   }
 
-  // Transform database post to feed post format
-  private transformToFeedPost(dbPost: any): FeedPost {
+  // Updated: Transform RPC results to FeedPost format
+  private async transformRpcPostToFeedPost(rpcPost: any): Promise<FeedPost> {
+    const session = await supabaseAuth.getSession();
+    const currentUserId = session.data.session?.user?.id;
+
     // Format the date nicely
     const formatDate = (dateString: string) => {
       try {
@@ -145,51 +187,179 @@ class FeedService {
       }
     };
 
-    // Ensure we have safe fallbacks for all required fields
-    const userProfile = dbPost.user_profiles || {};
-    const mediaItem = dbPost.media_items || {};
+    // FIXED: RPC functions return flat data, not nested objects
+    console.log('🔧 Transforming RPC post data:', {
+      id: rpcPost.id,
+      username: rpcPost.username,
+      media_item_id: rpcPost.media_item_id,
+      rating: rpcPost.rating
+    });
 
-    return {
-      id: dbPost.id || 'unknown-id',
+    // Get media item details if we have a media_item_id
+    let mediaItem: any = {
+      title: 'Unknown Media',
+      media_type: 'unknown',
+      image_url: 'https://via.placeholder.com/120x160'
+    };
+
+    if (rpcPost.media_item_id) {
+      try {
+        const mediaItems = await this.makeDirectRequest(
+          `media_items?id=eq.${rpcPost.media_item_id}&select=title,media_type,image_url,year,description`
+        );
+        if (mediaItems && mediaItems.length > 0) {
+          mediaItem = mediaItems[0];
+        }
+      } catch (error) {
+        console.warn('⚠️ Failed to fetch media item:', error);
+      }
+    }
+
+    // Check if current user has liked this post
+    let isLiked = false;
+    if (currentUserId && rpcPost.id) {
+      try {
+        const likeCheck = await this.makeDirectRequest(
+          `post_likes?select=id&post_id=eq.${rpcPost.id}&user_id=eq.${currentUserId}&limit=1`
+        );
+        isLiked = (likeCheck && likeCheck.length > 0);
+      } catch (error) {
+        console.warn('Error checking like status:', error);
+      }
+    }
+
+    // Bookmark status (placeholder for now)
+    const isBookmarked = false;
+
+    // Create post title from content if not provided
+    const postTitle = rpcPost.title || (rpcPost.content ? 
+      `${rpcPost.content.substring(0, 50)}${rpcPost.content.length > 50 ? '...' : ''}` : 
+      undefined
+    );
+
+    const transformedPost = {
+      id: rpcPost.id || 'unknown-id',
       user: {
-        name: userProfile.display_name || userProfile.username || 'Anonymous User',
-        avatar: userProfile.avatar_url || 'https://via.placeholder.com/40',
+        name: rpcPost.display_name || rpcPost.username || 'Anonymous User',
+        avatar: rpcPost.avatar_url || 'https://via.placeholder.com/40',
       },
       media: {
-        id: dbPost.media_id || 'unknown-media',
+        id: rpcPost.media_item_id || 'unknown-media',
         title: mediaItem.title || 'Unknown Media',
         type: mediaItem.media_type || 'unknown',
         cover: mediaItem.image_url || 'https://via.placeholder.com/120x160',
-        progress: dbPost.location_context || undefined,
+        progress: undefined, // Could add location context later
       },
-      date: formatDate(dbPost.created_at || new Date().toISOString()),
-      title: dbPost.title || undefined,
-      contentType: 'text', // For now, all posts are text-based
-      content: dbPost.content || '',
-      textContent: dbPost.content || '',
-      commentCount: dbPost.comment_count || 0,
-      likeCount: dbPost.like_count || 0,
-      isBookmarked: false, // TODO: Check if user has bookmarked this post
-      isLiked: false, // TODO: Check if user has liked this post
-      rating: dbPost.rating || undefined,
+      date: formatDate(rpcPost.created_at || new Date().toISOString()),
+      title: postTitle,
+      contentType: 'text' as const, // For now, all posts are text-based
+      content: rpcPost.content || '',
+      textContent: rpcPost.content || '',
+      // Use real comment and like counts from RPC function
+      commentCount: rpcPost.comment_count || 0,
+      likeCount: rpcPost.like_count || 0,
+      isBookmarked,
+      isLiked,
+      rating: rpcPost.rating || undefined,
     };
+
+    console.log('✅ Transformed post:', {
+      id: transformedPost.id,
+      userName: transformedPost.user.name,
+      mediaTitle: transformedPost.media.title,
+      rating: transformedPost.rating,
+      likeCount: transformedPost.likeCount
+    });
+
+    return transformedPost;
   }
 
-  // Refresh feed data
-  async refreshFeed(feedType: 'forYou' | 'friends'): Promise<FeedPost[]> {
-    if (feedType === 'forYou') {
-      return this.getForYouFeed();
-    } else {
-      return this.getFriendsFeed();
+  // Updated: Use RPC function for liked posts
+  async getUserLikedPosts(userId?: string, limit: number = 20): Promise<FeedPost[]> {
+    try {
+      const session = await supabaseAuth.getSession();
+      const targetUserId = userId || session.data.session?.user?.id;
+
+      if (!targetUserId) {
+        console.log('⚠️ No user ID provided for liked posts');
+        return [];
+      }
+
+      console.log(`💝 Fetching liked posts for user: ${targetUserId}`);
+      
+      // Use the working RPC function
+      const likedPosts = await this.callRPC('get_user_liked_posts', {
+        p_user_id: targetUserId,
+        p_limit: limit
+      });
+
+      console.log(`✅ Found ${likedPosts?.length || 0} liked posts`);
+      
+      // Transform the RPC results
+      const transformedPosts = await Promise.all(
+        (likedPosts || []).map(async (post: any) => await this.transformRpcPostToFeedPost(post))
+      );
+      
+      return transformedPosts;
+    } catch (error) {
+      console.error('❌ Error fetching liked posts:', error);
+      return [];
     }
   }
 
-  // Load more posts for infinite scroll
+  // Enhanced refresh with better error handling
+  async refreshFeed(feedType: 'forYou' | 'friends'): Promise<FeedPost[]> {
+    try {
+      console.log(`🔄 Refreshing ${feedType} feed...`);
+      
+      if (feedType === 'forYou') {
+        return await this.getForYouFeed();
+      } else {
+        return await this.getFriendsFeed();
+      }
+    } catch (error) {
+      console.error(`❌ Error refreshing ${feedType} feed:`, error);
+      throw error;
+    }
+  }
+
+  // Enhanced load more with better pagination
   async loadMorePosts(feedType: 'forYou' | 'friends', currentPostsCount: number): Promise<FeedPost[]> {
-    if (feedType === 'forYou') {
-      return this.getForYouFeed(20, currentPostsCount);
-    } else {
-      return this.getFriendsFeed(20, currentPostsCount);
+    try {
+      console.log(`📄 Loading more ${feedType} posts (offset: ${currentPostsCount})`);
+      
+      if (feedType === 'forYou') {
+        return await this.getForYouFeed(20, currentPostsCount);
+      } else {
+        return await this.getFriendsFeed(20, currentPostsCount);
+      }
+    } catch (error) {
+      console.error(`❌ Error loading more ${feedType} posts:`, error);
+      return [];
+    }
+  }
+
+  // New method to get feed stats
+  async getFeedStats(): Promise<{ totalPosts: number; totalUsers: number; lastUpdate: string }> {
+    try {
+      // Get total public posts count
+      const posts = await this.makeDirectRequest('posts?select=id&visibility=eq.public&limit=1000');
+      
+      // Get unique users count
+      const users = await this.makeDirectRequest('user_profiles?select=user_id&onboarding_completed=eq.true&limit=1000');
+      
+      return {
+        totalPosts: posts.length,
+        totalUsers: users.length,
+        lastUpdate: new Date().toISOString()
+      };
+    } catch (error) {
+      console.error('❌ Error fetching feed stats:', error);
+      return {
+        totalPosts: 0,
+        totalUsers: 0,
+        lastUpdate: new Date().toISOString()
+      };
     }
   }
 }

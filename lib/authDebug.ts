@@ -112,7 +112,7 @@ export class AuthDebugger {
       const token = session.session?.access_token || supabaseKey;
       
       // Query user_profiles table directly
-      const profileResponse = await fetch(`${supabaseUrl}/rest/v1/user_profiles?id=eq.${userId}`, {
+      const profileResponse = await fetch(`${supabaseUrl}/rest/v1/user_profiles?user_id=eq.${userId}`, {
         headers: {
           'apikey': supabaseKey,
           'Authorization': `Bearer ${token}`,
@@ -684,7 +684,7 @@ export class AuthDebugger {
       const { data: session } = await supabaseAuth.getSession();
       const token = session.session?.access_token || supabaseKey;
 
-      const response = await fetch(`${supabaseUrl}/rest/v1/user_profiles?id=eq.${userId}`, {
+      const response = await fetch(`${supabaseUrl}/rest/v1/user_profiles?user_id=eq.${userId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',

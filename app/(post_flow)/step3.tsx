@@ -223,7 +223,7 @@ export default function Step3() {
 
       console.log('📝 Creating post with:', createPostParams);
 
-      const result = await postService.createPost(createPostParams);
+      const result = await postService.createPostFixed(createPostParams);
 
       if (result.success) {
         // Set global flag to refresh feed when user returns to home
@@ -341,6 +341,7 @@ export default function Step3() {
           
           <View style={styles.stepTitleContainer}>
             <Text style={styles.stepTitle}>STEP 3</Text>
+            {/* Debug button commented out to prevent confusion and errors
             {__DEV__ && (
               <TouchableOpacity
                 style={styles.debugButton}
@@ -350,6 +351,7 @@ export default function Step3() {
                 <Text style={styles.debugButtonText}>Debug</Text>
               </TouchableOpacity>
             )}
+            */}
           </View>
 
           <View style={styles.mediaInfo}>
@@ -502,7 +504,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 20,
-    paddingTop: 60,
+    paddingTop: 10,
     paddingBottom: 40,
   },
   backButton: {

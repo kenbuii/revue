@@ -887,9 +887,58 @@ class MediaSearchService {
    */
   private async getNYTMediaById(isbn: string): Promise<MediaItem | null> {
     // NYT API doesn't have a direct "get by ISBN" endpoint
-    // This would require a different approach or caching bestseller data
-    console.log('⚠️ NYT media by ID not implemented - would require caching bestseller data');
+    // Fall back to Google Books API search using the ISBN
+    console.log('⚠️ NYT media by ID not implemented - falling back to Google Books search with ISBN:', isbn);
+    
+    try {
+      // Try to search Google Books using the ISBN
+      const searchUrl = this.googleBooksApiKey 
+        ? `${GOOGLE_BOOKS_BASE_URL}/volumes?q=isbn:${isbn}&key=${this.googleBooksApiKey}&maxResults=1`
+        : `${GOOGLE_BOOKS_BASE_URL}/volumes?q=isbn:${isbn}&maxResults=1`;
+
+      console.log('📚 Searching Google Books by ISBN:', isbn);
+      
+      const response = await fetch(searchUrl, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Google Books search error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      if (data.items && data.items.length > 0) {
+        const item = data.items[0];
+        const volumeInfo = item.volumeInfo || {};
+
+        console.log('✅ Found book via Google Books ISBN search:', {
+          title: volumeInfo.title,
+          authors: volumeInfo.authors,
+          isbn: isbn
+        });
+
+        return {
+          id: `google_books_${item.id}`, // Use Google Books ID for consistency
+          title: volumeInfo.title || 'Unknown Title',
+          type: 'book',
+          year: volumeInfo.publishedDate ? new Date(volumeInfo.publishedDate).getFullYear().toString() : undefined,
+          image: volumeInfo.imageLinks?.thumbnail || volumeInfo.imageLinks?.smallThumbnail,
+          description: volumeInfo.description,
+          source: 'google_books', // Change source to indicate it came from Google Books
+          originalId: item.id,
+          author: volumeInfo.authors?.join(', '),
+          rating: volumeInfo.averageRating,
+        };
+      } else {
+        console.log('📚 No results found in Google Books for ISBN:', isbn);
     return null;
+      }
+    } catch (error) {
+      console.error('❌ Error searching Google Books by ISBN:', error);
+      return null;
+    }
   }
 
   /**

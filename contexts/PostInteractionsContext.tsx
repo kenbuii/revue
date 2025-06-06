@@ -177,7 +177,7 @@ export function PostInteractionsProvider({ children }: { children: ReactNode }) 
         await saveLikesLocally(updatedLikes);
         
         // TODO: Call database service when available
-        // await likesService.togglePostLike(post.id);
+        await likesService.togglePostLike(post.id);
         
         return false;
       } else {
@@ -193,7 +193,7 @@ export function PostInteractionsProvider({ children }: { children: ReactNode }) 
         await saveLikesLocally(updatedLikes);
         
         // TODO: Call database service when available
-        // await likesService.togglePostLike(post.id);
+        await likesService.togglePostLike(post.id);
         
         return true;
       }

@@ -285,37 +285,37 @@ export class PostDebugger {
         return { error: 'Not authenticated' };
       }
       
+      console.log('🧪 Testing post creation using working RPC function...');
+      
+      // Use the working RPC function instead of broken direct insertion
       const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
       const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
       const token = session.session?.access_token || supabaseKey;
       
-      const testPost = {
-        user_id: user.id,
-        media_id: `test_book_${Date.now()}`,
-        title: 'Test Post for Debug',
-        content: 'This is a test post created during debug to verify the posts table functionality.',
-        rating: 8,
-        content_type: 'review',
-        tags: ['debug', 'test'],
-        is_public: true
+      const testParams = {
+        p_user_id: user.id,
+        p_content: 'This is a debug test post created using the working RPC function.',
+        p_media_item_id: null, // Use null instead of a fake media_id to avoid foreign key errors
+        p_rating: 8,
+        p_contains_spoilers: false,
+        p_visibility: 'public'
       };
       
-      console.log('Attempting to create test post:', testPost);
+      console.log('Attempting to create test post using RPC:', testParams);
       
-      const response = await fetch(`${supabaseUrl}/rest/v1/posts`, {
+      const response = await fetch(`${supabaseUrl}/rest/v1/rpc/create_post`, {
         method: 'POST',
         headers: {
           'apikey': supabaseKey!,
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
-          'Prefer': 'return=representation'
         },
-        body: JSON.stringify(testPost)
+        body: JSON.stringify(testParams)
       });
       
       const responseText = await response.text();
-      console.log('Create post response status:', response.status);
-      console.log('Create post response:', responseText);
+      console.log('Create post RPC response status:', response.status);
+      console.log('Create post RPC response:', responseText);
       
       let responseData;
       try {
@@ -326,9 +326,9 @@ export class PostDebugger {
       
       return {
         status: response.status,
-        success: response.status === 201,
+        success: response.status === 200 && responseData.success,
         response: responseData,
-        testData: testPost
+        testData: testParams
       };
       
     } catch (error) {

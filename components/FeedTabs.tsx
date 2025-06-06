@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle } f
 import { StyleSheet, Text, TouchableOpacity, View, ScrollView, Dimensions, RefreshControl, ActivityIndicator, NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
 import PostCard from '@/components/PostCard';
 import { feedService, FeedPost } from '@/lib/feedService';
+import { testFeedServiceInApp } from '@/lib/feedServiceTest';
+import { useHiddenPosts } from '@/contexts/HiddenPostsContext';
 
 type TabType = 'forYou' | 'friends';
 
@@ -24,7 +26,15 @@ const FeedTabs = forwardRef<FeedTabsRef, {}>((props, ref) => {
   const scrollViewRef = useRef<ScrollView>(null);
   const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
-  // Load initial feed data
+  const { filterVisiblePosts } = useHiddenPosts();
+
+  // Temporary diagnostic function
+  const runDiagnostic = async () => {
+    console.log('🔧 DIAGNOSTIC: Testing feed service...');
+    const result = await testFeedServiceInApp();
+    console.log('🔧 DIAGNOSTIC Result:', result);
+  };
+
   useEffect(() => {
     loadInitialData();
   }, []);
@@ -34,20 +44,27 @@ const FeedTabs = forwardRef<FeedTabsRef, {}>((props, ref) => {
       setLoading(true);
       console.log('🔄 Loading initial feed data...');
       
-      // Load both feeds initially
       const [forYouData, friendsData] = await Promise.all([
         feedService.getForYouFeed(),
         feedService.getFriendsFeed(),
       ]);
       
-      setForYouPosts(forYouData);
-      setFriendsPosts(friendsData);
+      const visibleForYouPosts = filterVisiblePosts(forYouData);
+      const visibleFriendsPosts = filterVisiblePosts(friendsData);
       
-      // Reset pagination states
-      setHasMoreForYou(forYouData.length >= 20); // Assume more if we got a full page
+      setForYouPosts(visibleForYouPosts);
+      setFriendsPosts(visibleFriendsPosts);
+      
+      setHasMoreForYou(forYouData.length >= 20);
       setHasMoreFriends(friendsData.length >= 20);
       
-      console.log(`✅ Loaded ${forYouData.length} For You posts and ${friendsData.length} Friends posts`);
+      console.log(`✅ Loaded ${visibleForYouPosts.length} For You posts and ${visibleFriendsPosts.length} Friends posts`);
+      
+      if (visibleForYouPosts.length > 0) {
+        const uniqueUsers = new Set(visibleForYouPosts.map(post => post.user.name));
+        console.log(`📊 For You feed contains posts from ${uniqueUsers.size} different users:`, Array.from(uniqueUsers));
+      }
+      
     } catch (error) {
       console.error('❌ Error loading initial feed data:', error);
     } finally {
@@ -59,9 +76,18 @@ const FeedTabs = forwardRef<FeedTabsRef, {}>((props, ref) => {
     try {
       console.log('🔄 Refreshing For You feed...');
       const refreshedPosts = await feedService.refreshFeed('forYou');
-      setForYouPosts(refreshedPosts);
+      
+      const visiblePosts = filterVisiblePosts(refreshedPosts);
+      
+      setForYouPosts(visiblePosts);
       setHasMoreForYou(refreshedPosts.length >= 20);
-      console.log(`✅ For You feed refreshed with ${refreshedPosts.length} posts`);
+      
+      console.log(`✅ For You feed refreshed with ${visiblePosts.length} visible posts (${refreshedPosts.length} total)`);
+      
+      if (visiblePosts.length > 0) {
+        const uniqueUsers = new Set(visiblePosts.map(post => post.user.name));
+        console.log(`📊 Refreshed feed contains posts from ${uniqueUsers.size} users`);
+      }
     } catch (error) {
       console.error('❌ Error refreshing For You feed:', error);
       throw error;
@@ -72,9 +98,13 @@ const FeedTabs = forwardRef<FeedTabsRef, {}>((props, ref) => {
     try {
       console.log('🔄 Refreshing Friends feed...');
       const refreshedPosts = await feedService.refreshFeed('friends');
-      setFriendsPosts(refreshedPosts);
+      
+      const visiblePosts = filterVisiblePosts(refreshedPosts);
+      
+      setFriendsPosts(visiblePosts);
       setHasMoreFriends(refreshedPosts.length >= 20);
-      console.log(`✅ Friends feed refreshed with ${refreshedPosts.length} posts`);
+      
+      console.log(`✅ Friends feed refreshed with ${visiblePosts.length} visible posts (${refreshedPosts.length} total)`);
     } catch (error) {
       console.error('❌ Error refreshing Friends feed:', error);
       throw error;
@@ -89,7 +119,6 @@ const FeedTabs = forwardRef<FeedTabsRef, {}>((props, ref) => {
     }
   };
 
-  // Deduplicate posts by ID
   const deduplicatePosts = (existingPosts: FeedPost[], newPosts: FeedPost[]): FeedPost[] => {
     const existingIds = new Set(existingPosts.map(post => post.id));
     const uniqueNewPosts = newPosts.filter(post => !existingIds.has(post.id));
@@ -97,14 +126,12 @@ const FeedTabs = forwardRef<FeedTabsRef, {}>((props, ref) => {
   };
 
   const loadMorePosts = async () => {
-    // Throttle calls - prevent multiple simultaneous loads
     const now = Date.now();
     if (loadingMore || (now - lastLoadTime) < 1000) {
       console.log('⏳ Throttling load more request');
       return;
     }
 
-    // Check if we have more posts to load
     const hasMore = activeTab === 'forYou' ? hasMoreForYou : hasMoreFriends;
     if (!hasMore) {
       console.log('📄 No more posts available for', activeTab);
@@ -120,16 +147,17 @@ const FeedTabs = forwardRef<FeedTabsRef, {}>((props, ref) => {
       const morePosts = await feedService.loadMorePosts(activeTab, currentPosts.length);
       
       if (morePosts.length > 0) {
+        const visibleMorePosts = filterVisiblePosts(morePosts);
+        
         if (activeTab === 'forYou') {
-          setForYouPosts(prev => deduplicatePosts(prev, morePosts));
-          setHasMoreForYou(morePosts.length >= 20); // If we got less than a full page, no more
+          setForYouPosts(prev => deduplicatePosts(prev, visibleMorePosts));
+          setHasMoreForYou(morePosts.length >= 20);
         } else {
-          setFriendsPosts(prev => deduplicatePosts(prev, morePosts));
+          setFriendsPosts(prev => deduplicatePosts(prev, visibleMorePosts));
           setHasMoreFriends(morePosts.length >= 20);
         }
-        console.log(`✅ Loaded ${morePosts.length} more ${activeTab} posts`);
+        console.log(`✅ Loaded ${visibleMorePosts.length} more visible ${activeTab} posts (${morePosts.length} total fetched)`);
       } else {
-        // No more posts available
         if (activeTab === 'forYou') {
           setHasMoreForYou(false);
         } else {
@@ -144,12 +172,10 @@ const FeedTabs = forwardRef<FeedTabsRef, {}>((props, ref) => {
     }
   };
 
-  // Handle scroll for infinite loading
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
     const paddingToBottom = 20;
     
-    // Check if user is near bottom (within 20px)
     const isCloseToBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom;
     
     if (isCloseToBottom) {
@@ -157,7 +183,6 @@ const FeedTabs = forwardRef<FeedTabsRef, {}>((props, ref) => {
     }
   };
 
-  // Expose methods via ref
   useImperativeHandle(ref, () => ({
     refreshCurrentFeed,
     refreshForYouFeed,
@@ -166,7 +191,6 @@ const FeedTabs = forwardRef<FeedTabsRef, {}>((props, ref) => {
 
   const handleTabPress = (tab: TabType) => {
     setActiveTab(tab);
-    // Scroll to top when switching tabs
     scrollViewRef.current?.scrollTo({ y: 0, animated: true });
   };
 
@@ -198,27 +222,31 @@ const FeedTabs = forwardRef<FeedTabsRef, {}>((props, ref) => {
         </View>
       );
     }
-    
-    if (!loadingMore) return null;
-    
-    return (
-      <View style={styles.loadingFooter}>
-        <ActivityIndicator size="small" color="#004D00" />
-        <Text style={styles.loadingFooterText}>Loading more posts...</Text>
-      </View>
-    );
+
+    if (loadingMore) {
+      return (
+        <View style={styles.loadingMoreContainer}>
+          <ActivityIndicator size="small" color="#004D00" />
+          <Text style={styles.loadingMoreText}>Loading more posts...</Text>
+        </View>
+      );
+    }
+
+    return null;
   };
 
   const renderEmptyState = (tabType: TabType) => {
+    const isForYou = tabType === 'forYou';
+    
     return (
       <View style={styles.emptyContainer}>
         <Text style={styles.emptyTitle}>
-          {tabType === 'forYou' ? 'Welcome to Revue!' : 'No posts from friends yet'}
+          {isForYou ? 'No posts to show' : 'No posts from friends yet'}
         </Text>
-        <Text style={styles.emptySubtext}>
-          {tabType === 'forYou' 
-            ? 'Start following people and creating posts to see content here.'
-            : 'Follow friends to see their posts in this feed.'
+        <Text style={styles.emptySubtitle}>
+          {isForYou 
+            ? 'Follow users and create posts to see content in your feed'
+            : 'Follow users to see their posts here'
           }
         </Text>
       </View>
@@ -226,62 +254,26 @@ const FeedTabs = forwardRef<FeedTabsRef, {}>((props, ref) => {
   };
 
   const renderFeedContent = () => {
+    const currentPosts = getCurrentPosts();
+    
     if (loading) {
       return (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#004D00" />
-          <Text style={styles.loadingText}>Loading your feed...</Text>
+          <Text style={styles.loadingText}>Loading posts...</Text>
         </View>
       );
     }
-
-    const currentPosts = getCurrentPosts();
 
     if (currentPosts.length === 0) {
       return renderEmptyState(activeTab);
     }
 
     return (
-      <>
-        {currentPosts.map((post) => (
-          <PostCard key={post.id} post={post} />
-        ))}
-        {renderLoadingFooter()}
-        {/* Dynamic spacing based on post count */}
-        <View style={[styles.bottomSpacer, { height: Math.max(50, currentPosts.length * 2) }]} />
-      </>
-    );
-  };
-
-  return (
-    <View style={styles.container}>
-      {/* Tab Header */}
-      <View style={styles.tabsContainer}>
-        <TouchableOpacity 
-          style={[styles.tab, activeTab === 'forYou' && styles.activeTab]} 
-          onPress={() => handleTabPress('forYou')}
-        >
-          <Text style={[styles.tabText, activeTab === 'forYou' && styles.activeTabText]}>
-            For You
-          </Text>
-          {activeTab === 'forYou' && <View style={styles.activeIndicator} />}
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={[styles.tab, activeTab === 'friends' && styles.activeTab]}
-          onPress={() => handleTabPress('friends')}
-        >
-          <Text style={[styles.tabText, activeTab === 'friends' && styles.activeTabText]}>
-            Friends + Following
-          </Text>
-          {activeTab === 'friends' && <View style={styles.activeIndicator} />}
-        </TouchableOpacity>
-      </View>
-
-      {/* Feed Content - Simple ScrollView like profile.tsx */}
       <ScrollView
         ref={scrollViewRef}
-        style={styles.feedContainer}
+        style={styles.scrollView}
+        showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -292,119 +284,171 @@ const FeedTabs = forwardRef<FeedTabsRef, {}>((props, ref) => {
         }
         onScroll={handleScroll}
         scrollEventThrottle={400}
-        showsVerticalScrollIndicator={false}
       >
-        {renderFeedContent()}
+        {currentPosts.map((post, index) => (
+          <PostCard 
+            key={post.id} 
+            post={post}
+          />
+        ))}
+        {renderLoadingFooter()}
       </ScrollView>
+    );
+  };
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.tabContainer}>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'forYou' && styles.activeTab]}
+          onPress={() => handleTabPress('forYou')}
+        >
+          <Text style={[styles.tabText, activeTab === 'forYou' && styles.activeTabText]}>
+            For You
+          </Text>
+          {__DEV__ && forYouPosts.length > 0 && (
+            <Text style={styles.debugCount}>({forYouPosts.length})</Text>
+          )}
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'friends' && styles.activeTab]}
+          onPress={() => handleTabPress('friends')}
+        >
+          <Text style={[styles.tabText, activeTab === 'friends' && styles.activeTabText]}>
+            Friends + Following
+          </Text>
+          {__DEV__ && friendsPosts.length > 0 && (
+            <Text style={styles.debugCount}>({friendsPosts.length})</Text>
+          )}
+        </TouchableOpacity>
+      </View>
+
+      {/* Temporary diagnostic button */}
+      {__DEV__ && (
+        <TouchableOpacity style={styles.diagnosticButton} onPress={runDiagnostic}>
+          <Text style={styles.diagnosticButtonText}>🧪 Test RPC</Text>
+        </TouchableOpacity>
+      )}
+
+      <View style={styles.content}>
+        {renderFeedContent()}
+      </View>
     </View>
   );
 });
 
 FeedTabs.displayName = 'FeedTabs';
 
-export default FeedTabs;
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#FFFDF6',
   },
-  tabsContainer: {
+  tabContainer: {
     flexDirection: 'row',
+    backgroundColor: '#FFFDF6',
     borderBottomWidth: 1,
     borderBottomColor: '#E8E8E8',
-    backgroundColor: '#FFFDF6',
   },
   tab: {
     flex: 1,
+    paddingVertical: 16,
+    paddingHorizontal: 8,
     alignItems: 'center',
-    paddingVertical: 15,
-    position: 'relative',
+    justifyContent: 'center',
   },
-  activeTab: {},
+  activeTab: {
+    borderBottomWidth: 2,
+    borderBottomColor: '#004D00',
+  },
   tabText: {
-    fontSize: 16,
+    fontSize: 14,
+    fontWeight: '500',
     color: '#666',
-    fontFamily: 'LibreBaskerville_400Regular',
   },
   activeTabText: {
-    fontSize: 16,
-    color: '#142D0A',
-    fontFamily: 'LibreBaskerville_700Bold',
+    color: '#004D00',
+    fontWeight: '600',
   },
-  activeIndicator: {
-    position: 'absolute',
-    bottom: 0,
-    height: 3,
-    width: '80%',
-    backgroundColor: '#004D00',
-    borderRadius: 2,
+  debugCount: {
+    fontSize: 10,
+    color: '#999',
+    marginTop: 2,
   },
-  feedContainer: {
+  content: {
+    flex: 1,
+  },
+  scrollView: {
     flex: 1,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 60,
+    paddingTop: 100,
   },
   loadingText: {
-    marginTop: 16,
-    fontSize: 16,
+    marginTop: 10,
     color: '#666',
-    fontFamily: 'LibreBaskerville_700Bold',
+    fontSize: 16,
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 60,
-    paddingHorizontal: 20,
+    paddingHorizontal: 40,
+    paddingTop: 100,
   },
   emptyTitle: {
     fontSize: 20,
     fontWeight: '600',
-    fontFamily: 'LibreBaskerville_700Bold',
     color: '#333',
     marginBottom: 8,
-  },
-  emptySubtext: {
-    fontSize: 16,
-    color: '#666',
-    fontFamily: 'LibreBaskerville_400Regular',
     textAlign: 'center',
   },
-  loadingFooter: {
+  emptySubtitle: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  loadingMoreContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 10,
+    justifyContent: 'center',
+    paddingVertical: 20,
   },
-  loadingFooterText: {
-    marginLeft: 10,
-    fontSize: 16,
+  loadingMoreText: {
+    marginLeft: 8,
     color: '#666',
-    fontFamily: 'LibreBaskerville_400Regular',
+    fontSize: 14,
   },
   endOfFeedContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
     paddingVertical: 30,
+    alignItems: 'center',
   },
   endOfFeedText: {
     fontSize: 16,
-    color: '#004D00',
-    fontFamily: 'LibreBaskerville_700Bold',
-    textAlign: 'center',
+    fontWeight: '600',
+    color: '#333',
     marginBottom: 4,
   },
   endOfFeedSubtext: {
     fontSize: 14,
     color: '#666',
-    fontFamily: 'LibreBaskerville_400Regular',
-    textAlign: 'center',
   },
-  bottomSpacer: {
-    height: 50,
+  diagnosticButton: {
+    padding: 16,
+    backgroundColor: '#004D00',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  diagnosticButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFF',
   },
 });
+
+export default FeedTabs;
