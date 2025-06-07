@@ -43,12 +43,21 @@ const FeedTabs = forwardRef<FeedTabsRef, {}>((props, ref) => {
       setForYouPosts(forYouData);
       setFriendsPosts(friendsData);
       
-      // FIXED: Better pagination logic - only assume more if we got EXACTLY the limit
-      setHasMoreForYou(forYouData.length === 20);
-      setHasMoreFriends(friendsData.length === 20);
+      // FIXED: Assume there are more posts unless we got fewer than the limit
+      // This is more optimistic and lets the next load determine if we're at the end
+      setHasMoreForYou(forYouData.length >= 20);
+      setHasMoreFriends(friendsData.length >= 20);
       
       console.log(`✅ Loaded ${forYouData.length} For You posts and ${friendsData.length} Friends posts`);
-      console.log(`📊 HasMore: ForYou=${forYouData.length === 20}, Friends=${friendsData.length === 20}`);
+      console.log(`🔍 DEBUG State: hasMoreForYou=${forYouData.length >= 20}, hasMoreFriends=${friendsData.length >= 20}`);
+      
+      // DEBUG: Check if content might be tall enough to scroll
+      setTimeout(() => {
+        console.log(`🔍 CONTENT HEIGHT CHECK: Posts loaded, screen height is ~${screenHeight}px. Each post is ~200-300px, so ${forYouData.length} posts should be ~${forYouData.length * 250}px tall.`);
+        if (forYouData.length * 250 < screenHeight + 500) {
+          console.log(`⚠️ WARNING: Content might not be tall enough to trigger scroll detection! Need more posts or taller content.`);
+        }
+      }, 2000);
     } catch (error) {
       console.error('❌ Error loading initial feed data:', error);
     } finally {
@@ -61,7 +70,9 @@ const FeedTabs = forwardRef<FeedTabsRef, {}>((props, ref) => {
       console.log('🔄 Refreshing For You feed...');
       const refreshedPosts = await feedService.refreshFeed('forYou');
       setForYouPosts(refreshedPosts);
-      setHasMoreForYou(refreshedPosts.length === 20);
+      // FIXED: Don't assume no more posts just because refresh returned < 20
+      // Keep hasMore as true to allow user to scroll and discover if there are more
+      setHasMoreForYou(true);
       console.log(`✅ For You feed refreshed with ${refreshedPosts.length} posts`);
     } catch (error) {
       console.error('❌ Error refreshing For You feed:', error);
@@ -74,7 +85,8 @@ const FeedTabs = forwardRef<FeedTabsRef, {}>((props, ref) => {
       console.log('🔄 Refreshing Friends feed...');
       const refreshedPosts = await feedService.refreshFeed('friends');
       setFriendsPosts(refreshedPosts);
-      setHasMoreFriends(refreshedPosts.length === 20);
+      // FIXED: Same logic as above
+      setHasMoreFriends(true);
       console.log(`✅ Friends feed refreshed with ${refreshedPosts.length} posts`);
     } catch (error) {
       console.error('❌ Error refreshing Friends feed:', error);
@@ -125,17 +137,18 @@ const FeedTabs = forwardRef<FeedTabsRef, {}>((props, ref) => {
         if (activeTab === 'forYou') {
           const newPostsList = deduplicatePosts(forYouPosts, morePosts);
           setForYouPosts(newPostsList);
-          // FIXED: Only hasMore if we got exactly the requested amount (20)
-          setHasMoreForYou(morePosts.length === 20);
-          console.log(`✅ For You posts: ${forYouPosts.length} → ${newPostsList.length} (hasMore: ${morePosts.length === 20})`);
+          // FIXED: Only set hasMore to false if we got FEWER than requested (< 20)
+          // This indicates we've hit the end of available posts
+          setHasMoreForYou(morePosts.length >= 20);
+          console.log(`✅ For You posts: ${forYouPosts.length} → ${newPostsList.length} (hasMore: ${morePosts.length >= 20})`);
         } else {
           const newPostsList = deduplicatePosts(friendsPosts, morePosts);
           setFriendsPosts(newPostsList);
-          setHasMoreFriends(morePosts.length === 20);
-          console.log(`✅ Friends posts: ${friendsPosts.length} → ${newPostsList.length} (hasMore: ${morePosts.length === 20})`);
+          setHasMoreFriends(morePosts.length >= 20);
+          console.log(`✅ Friends posts: ${friendsPosts.length} → ${newPostsList.length} (hasMore: ${morePosts.length >= 20})`);
         }
       } else {
-        // No more posts available
+        // No more posts available - this is the definitive end
         if (activeTab === 'forYou') {
           setHasMoreForYou(false);
         } else {
@@ -153,13 +166,22 @@ const FeedTabs = forwardRef<FeedTabsRef, {}>((props, ref) => {
   // Handle scroll for infinite loading
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
-    const paddingToBottom = 100; // INCREASED from 20 to 100 for easier triggering
+    const paddingToBottom = 500; // VERY AGGRESSIVE - trigger much earlier
     
-    // Check if user is near bottom
+    // AGGRESSIVE DEBUGGING - Log every scroll event
+    const scrollY = Math.round(contentOffset.y);
+    const contentHeight = Math.round(contentSize.height);
+    const screenHeight = Math.round(layoutMeasurement.height);
+    const distanceFromBottom = contentHeight - (scrollY + screenHeight);
     const isCloseToBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom;
     
+    // Log periodically for debugging (every ~300px of scroll)
+    if (scrollY % 300 < 50) {
+      console.log(`📜 SCROLL DEBUG: y=${scrollY}, contentH=${contentHeight}, screenH=${screenHeight}, distFromBottom=${distanceFromBottom}, closeToBottom=${isCloseToBottom}`);
+    }
+    
     if (isCloseToBottom) {
-      console.log(`🎯 Near bottom detected! Triggering loadMorePosts... (${Math.round(contentOffset.y)}/${Math.round(contentSize.height)})`);
+      console.log(`🎯 Near bottom detected! Triggering loadMorePosts... (${scrollY}/${contentHeight})`);
       loadMorePosts();
     }
   };
@@ -298,7 +320,7 @@ const FeedTabs = forwardRef<FeedTabsRef, {}>((props, ref) => {
           />
         }
         onScroll={handleScroll}
-        scrollEventThrottle={100} // REDUCED from 400 to 100 for more responsive detection
+        scrollEventThrottle={50} // REDUCED from 100 to 50 for more responsive detection
         showsVerticalScrollIndicator={false}
       >
         {renderFeedContent()}

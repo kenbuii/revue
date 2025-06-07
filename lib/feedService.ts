@@ -80,10 +80,6 @@ class FeedService {
     try {
       console.log('📰 Fetching For You feed using RPC...');
       
-      // TEMPORARY: Force fallback to debug the issue
-      console.log('🚨 TEMPORARILY USING POSTGREST FALLBACK FOR DEBUGGING');
-      return this.getForYouFeedFallback(limit, offset);
-      
       const session = await supabaseAuth.getSession();
       const userId = session.data.session?.user?.id;
       
@@ -106,10 +102,6 @@ class FeedService {
   // HYBRID APPROACH: Use RPC for friends feed
   async getFriendsFeed(limit: number = 20, offset: number = 0): Promise<FeedPost[]> {
     try {
-      // TEMPORARY: Force fallback to debug the issue
-      console.log('🚨 TEMPORARILY USING POSTGREST FALLBACK FOR DEBUGGING');
-      return this.getFriendsFeedFallback(limit, offset);
-      
       const session = await supabaseAuth.getSession();
       const userId = session.data.session?.user?.id;
 
@@ -169,6 +161,23 @@ class FeedService {
 
   // Transform RPC function results to FeedPost format
   private transformRPCPostToFeedPost(dbPost: any): FeedPost {
+    // Enhanced debugging for user data
+    if (!dbPost.display_name && !dbPost.username) {
+      console.warn('⚠️ RPC Post with missing user data:', {
+        postId: dbPost.id,
+        userId: dbPost.user_id,
+        display_name: dbPost.display_name,
+        username: dbPost.username,
+        rawPost: dbPost
+      });
+    } else {
+      console.log('✅ RPC Post with user data:', {
+        postId: dbPost.id,
+        username: dbPost.username,
+        display_name: dbPost.display_name
+      });
+    }
+
     const formatDate = (dateString: string) => {
       const date = new Date(dateString);
       const now = new Date();
@@ -208,6 +217,23 @@ class FeedService {
 
   // Transform PostgREST results to FeedPost format (legacy format)
   private transformPostgRESTPostToFeedPost(dbPost: any): FeedPost {
+    // Enhanced debugging for user data
+    const userProfile = dbPost.user_profiles;
+    if (!userProfile?.display_name && !userProfile?.username) {
+      console.warn('⚠️ PostgREST Post with missing user data:', {
+        postId: dbPost.id,
+        userId: dbPost.user_id,
+        userProfile: userProfile,
+        rawPost: dbPost
+      });
+    } else {
+      console.log('✅ PostgREST Post with user data:', {
+        postId: dbPost.id,
+        username: userProfile?.username,
+        display_name: userProfile?.display_name
+      });
+    }
+
     const formatDate = (dateString: string) => {
       const date = new Date(dateString);
       const now = new Date();
@@ -253,7 +279,6 @@ class FeedService {
       const posts = await this.makeDirectRequest(
         `posts?select=*,user_profiles(*),media_items(*)`
         + `&is_public=eq.true`
-        + `&user_profiles.onboarding_completed=eq.true`
         + `&order=created_at.desc`
         + `&limit=${limit}`
         + `&offset=${offset}`
@@ -275,7 +300,6 @@ class FeedService {
       const posts = await this.makeDirectRequest(
         `posts?select=*,user_profiles(*),media_items(*)`
         + `&is_public=eq.true`
-        + `&user_profiles.onboarding_completed=eq.true`
         + `&order=created_at.desc`
         + `&limit=${limit}`
         + `&offset=${offset}`

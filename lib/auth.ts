@@ -176,6 +176,23 @@ class AuthService {
       }
 
       console.log('✅ User signed in successfully');
+      
+      // CRITICAL: Ensure user profile exists after successful login
+      if (data.user) {
+        console.log('🔍 Validating user profile after login...');
+        const profileResult = await this.ensureUserProfileExists(data.user.id);
+        
+        if (!profileResult.success) {
+          console.warn('⚠️ Profile validation failed after login:', profileResult.error);
+          // Don't fail the login, but log the issue
+        } else {
+          console.log('✅ User profile validated after login');
+        }
+        
+        // Also sync any local onboarding data to Supabase
+        await this.syncOnboardingDataToSupabase();
+      }
+      
       return { user: data.user, session: data.session, error: undefined };
     } catch (err) {
       console.error('Sign in failed:', err);
@@ -298,27 +315,103 @@ class AuthService {
   }
 
   /**
+   * Ensure user profile exists in database before completing onboarding
+   */
+  private async ensureUserProfileExists(userId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const supabaseUrl = Constants.expoConfig?.extra?.supabaseUrl;
+      const supabaseAnonKey = Constants.expoConfig?.extra?.supabaseAnonKey;
+      
+      if (!supabaseUrl || !supabaseAnonKey) {
+        console.log('🔧 Supabase configuration missing - skipping profile validation');
+        return { success: false, error: 'Supabase configuration missing' };
+      }
+
+      // Get auth token
+      const { session } = await this.getCurrentSession();
+      const token = session?.access_token || supabaseAnonKey;
+
+      console.log('🔍 Ensuring user profile exists for:', userId);
+
+      const response = await fetch(`${supabaseUrl}/rest/v1/rpc/ensure_user_profile_exists`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': supabaseAnonKey,
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ p_user_id: userId }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.text();
+        console.error('❌ Profile validation error:', response.status, errorData);
+        return { success: false, error: `Profile validation failed: ${response.status}` };
+      }
+
+      const result = await response.json();
+      console.log('✅ Profile validation result:', result);
+
+      if (result.success) {
+        if (result.profile_existed) {
+          console.log('✅ User profile already existed');
+        } else {
+          console.log('✅ User profile created successfully:', result.created_username);
+        }
+        return { success: true };
+      } else {
+        console.error('❌ Profile validation failed:', result.error);
+        return { success: false, error: result.error };
+      }
+
+    } catch (error) {
+      console.error('❌ Error ensuring user profile exists:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      };
+    }
+  }
+
+  /**
    * Mark onboarding as completed
    */
   async completeOnboarding(): Promise<{ success: boolean; error?: string }> {
     try {
-      await AsyncStorage.setItem('onboarding_completed', 'true');
+      console.log('🎯 Starting onboarding completion...');
       
-      // Also save to Supabase if user is authenticated
+      // First, ensure we have a session
       const { session } = await this.getCurrentSession();
-      if (session?.user) {
-        // IMPORTANT: Get existing onboarding data first to preserve it
-        const existingData = await this.getOnboardingData();
-        await this.saveToSupabase(session.user.id, { 
-          ...existingData,  // Preserve all existing data
-          onboarding_completed: true  // Only update the completion flag
-        });
+      if (!session?.user) {
+        console.error('❌ No active session for onboarding completion');
+        return { success: false, error: 'No active session' };
       }
+
+      // CRITICAL: Ensure user_profiles record exists before marking complete
+      console.log('🔍 Ensuring user profile exists before completion...');
+      const profileResult = await this.ensureUserProfileExists(session.user.id);
       
-      console.log('✅ Onboarding marked as completed');
+      if (!profileResult.success) {
+        console.error('❌ Failed to ensure user profile exists:', profileResult.error);
+        return { success: false, error: `Profile validation failed: ${profileResult.error}` };
+      }
+
+      // Mark as completed in local storage
+      await AsyncStorage.setItem('onboarding_completed', 'true');
+      console.log('✅ Marked onboarding as completed in local storage');
+      
+      // Save to Supabase with profile validation
+      console.log('💾 Saving onboarding completion to Supabase...');
+      const existingData = await this.getOnboardingData();
+      await this.saveToSupabase(session.user.id, { 
+        ...existingData,  // Preserve all existing data
+        onboarding_completed: true  // Only update the completion flag
+      });
+      
+      console.log('🎉 Onboarding completion successful!');
       return { success: true };
     } catch (err) {
-      console.error('Error completing onboarding:', err);
+      console.error('❌ Error completing onboarding:', err);
       return { 
         success: false, 
         error: err instanceof Error ? err.message : 'Unknown error' 
